@@ -336,7 +336,7 @@ scheduler.add_job(func=generate_reports, trigger="interval", hours=24)
 @login_required
 def share_card():
     user = current_user
-    if user.relative_email and app.config['MAIL_USERNAME']:
+    if user.relative_email and app.config.get('MAIL_USERNAME'):
         try:
             share_url = f"http://127.0.0.1:5000/family/{user.id}"
             msg = Message(f"PulseGuard Family Access for {user.full_name}", recipients=[user.relative_email])
@@ -346,6 +346,28 @@ def share_card():
         except Exception as e:
             return jsonify({"error": str(e)}), 400
     return jsonify({"error": "Relative email not configured."}), 400
+@app.route('/api/health/generate_report', methods=['POST'])
+@login_required
+def create_manual_report():
+    measurements = HealthMeasurement.query.filter_by(user_id=current_user.id).all()
+    if not measurements:
+        return jsonify({"status": "error", "message": "No measurements recorded yet."}), 400
+    avg_hr = sum(m.bpm for m in measurements) / len(measurements)
+    abnorms = sum(1 for m in measurements if m.is_abnormal)
+    summary = f"On-Demand Summary: Average heart rate is {avg_hr:.1f} BPM across {len(measurements)} screenings with {abnorms} flagged readings."
+    report = Report(user_id=current_user.id, period="On-Demand", avg_hr=avg_hr, abnormal_count=abnorms, summary_text=summary)
+    db.session.add(report)
+    db.session.commit()
+    
+    if current_user.relative_email and app.config.get('MAIL_USERNAME'):
+        try:
+            share_url = f"http://127.0.0.1:5000/family/{current_user.id}"
+            msg = Message(f"PulseGuard On-Demand Health Report for {current_user.full_name}", recipients=[current_user.relative_email])
+            msg.body = f"Hello {current_user.relative_name},\n\nHere is an on-demand health summary for {current_user.full_name}:\n- Average Heart Rate: {avg_hr:.1f} BPM\n- Abnormal Readings: {abnorms}\n- Total Screenings: {len(measurements)}\n\nLive Family Card: {share_url}"
+            mail.send(msg)
+        except Exception as e:
+            print("Failed to dispatch report email:", e)
+    return jsonify({"status": "success", "message": "On-demand report generated and emailed to your relative!"})
 
 
 
@@ -538,6 +560,22 @@ def cancel_appointment(appt_id):
     appt.status = 'cancelled'
     db.session.commit()
     return jsonify({"status": "cancelled"})
+
+@app.route('/api/appointments/<int:appt_id>/delete', methods=['POST'])
+@login_required
+def delete_appointment(appt_id):
+    appt = DoctorAppointment.query.get_or_404(appt_id)
+    if appt.user_id == current_user.id:
+        db.session.delete(appt)
+        db.session.commit()
+    return jsonify({"status": "deleted"})
+
+@app.route('/api/appointments/clear_history', methods=['POST'])
+@login_required
+def clear_appointment_history():
+    DoctorAppointment.query.filter(DoctorAppointment.user_id == current_user.id, DoctorAppointment.status.in_(['completed', 'cancelled'])).delete()
+    db.session.commit()
+    return jsonify({"status": "cleared"})
 
 @app.route('/videochat/<room_id>')
 def videochat(room_id):
