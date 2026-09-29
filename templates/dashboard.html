@@ -19,22 +19,30 @@ PulseGuard AI — Dashboard
 
   <!-- ── Sidebar ─────────────────────────────────────────────────────── -->
   <aside class="pg-sidebar" id="sidebar">
-    <div class="sidebar-logo">
-      <i class="fas fa-heartbeat logo-icon"></i>
-      <span class="logo-text">PulseGuard AI</span>
-    </div>
-    <nav class="sidebar-nav">
-      <a href="/" class="nav-item"><i class="fas fa-home"></i><span>Home</span></a>
-      <a href="/dashboard" class="nav-item active"><i class="fas fa-chart-line"></i><span>Dashboard</span></a><a
-        href="/heartrate" class="nav-item"><i class="fas fa-heartbeat"></i><span>Heart Rate</span></a><a href="/chat"
-        class="nav-item"><i class="fas fa-robot"></i><span>AI Assistant</span></a>
-      <a href="/lifestyle" class="nav-item"><i class="fas fa-running"></i><span>Lifestyle</span></a>
-      <a href="/diet" class="nav-item"><i class="fas fa-apple-alt"></i><span>Diet Analysis</span></a>
-      <a href="/emergency" class="nav-item"><i class="fas fa-ambulance"></i><span>Emergency</span></a>
-      <a href="/#prediction" class="nav-item"><i class="fas fa-stethoscope"></i><span>Risk Prediction</span></a>
-    </nav>
-    <a href="/emergency" class="sidebar-sos"><i class="fas fa-exclamation-triangle"></i><span>SOS Emergency</span></a>
-  </aside>
+  <div class="sidebar-logo">
+    <i class="fas fa-heartbeat logo-icon"></i>
+    <span class="logo-text">PulseGuard AI</span>
+  </div>
+  <nav class="sidebar-nav">
+    <a href="/" class="nav-item"><i class="fas fa-home"></i><span>Home</span></a>
+    <a href="/dashboard" class="nav-item active"><i class="fas fa-chart-line"></i><span>Dashboard</span></a>
+    <a href="/heartrate" class="nav-item "><i class="fas fa-heartbeat"></i><span>Heart Rate (PPG)</span></a>
+    <a href="/appointments" class="nav-item " style="color:#2ecc71;font-weight:600;"><i class="fas fa-video"></i><span>Doctor Video Call</span></a>
+    <a href="/doctor" class="nav-item " style="color:#3498db;font-weight:600;"><i class="fas fa-user-md"></i><span>Doctor Portal</span></a>
+    <a href="/reports" class="nav-item "><i class="fas fa-file-medical"></i><span>Reports & Family</span></a>
+    <a href="/chat" class="nav-item "><i class="fas fa-robot"></i><span>AI Assistant</span></a>
+    <a href="/lifestyle" class="nav-item "><i class="fas fa-running"></i><span>Lifestyle</span></a>
+    <a href="/diet" class="nav-item "><i class="fas fa-apple-alt"></i><span>Diet Analysis</span></a>
+    <a href="/emergency" class="nav-item "><i class="fas fa-ambulance"></i><span>Emergency</span></a>
+    {% if current_user.is_authenticated %}
+    <a href="/logout" class="nav-item" style="color:#e74c3c; margin-top:14px;"><i class="fas fa-sign-out-alt"></i><span>Logout ({{ current_user.full_name.split()[0] }})</span></a>
+    {% else %}
+    <a href="/login" class="nav-item" style="color:#2ecc71; margin-top:14px;"><i class="fas fa-sign-in-alt"></i><span>Login</span></a>
+    <a href="/register" class="nav-item"><i class="fas fa-user-plus"></i><span>Register</span></a>
+    {% endif %}
+  </nav>
+  <a href="/emergency" class="sidebar-sos"><i class="fas fa-exclamation-triangle"></i><span>SOS Emergency</span></a>
+</aside>
 
   <!-- ── Main ────────────────────────────────────────────────────────── -->
   <main class="pg-main">
@@ -51,6 +59,65 @@ PulseGuard AI — Dashboard
     </header>
 
     <div class="pg-content">
+
+      <!-- ── NEW FEATURES PROMINENT ACCESS BANNER ────────────────────── -->
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:18px; margin-bottom:24px;" class="fade-in">
+        
+        <!-- Doctor Video Call Card -->
+        <div class="card" style="border-left: 4px solid #2ecc71; background: linear-gradient(135deg, rgba(46,204,113,0.12), rgba(255,255,255,0.02));">
+          <div style="font-size:11px; color:#2ecc71; text-transform:uppercase; font-weight:800; letter-spacing:1px; margin-bottom:4px;">Telemedicine & Video</div>
+          <h3 style="margin:0 0 8px; font-size:18px;"><i class="fas fa-video" style="color:#2ecc71; margin-right:6px;"></i> Doctor Consultation</h3>
+          <p style="font-size:13px; color:var(--muted); line-height:1.5; margin:0 0 16px;">
+            Auto-schedules when abnormal PPG heart rate is detected. Accept & join live 1-on-1 video call.
+          </p>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <a href="/appointments" style="padding:8px 16px; font-size:13px; font-weight:700; text-decoration:none; border-radius:8px; background:#2ecc71; color:#fff; display:inline-flex; align-items:center; gap:6px;">
+              <i class="fas fa-calendar-check"></i> My Appointments
+            </a>
+            <a href="/doctor" style="padding:8px 16px; font-size:13px; font-weight:700; text-decoration:none; border-radius:8px; background:rgba(52,152,219,0.15); color:#3498db; border:1px solid rgba(52,152,219,0.3); display:inline-flex; align-items:center; gap:6px;">
+              <i class="fas fa-user-md"></i> Doctor Portal
+            </a>
+          </div>
+        </div>
+
+        <!-- Reports & Family Card -->
+        <div class="card" style="border-left: 4px solid #3498db; background: linear-gradient(135deg, rgba(52,152,219,0.12), rgba(255,255,255,0.02));">
+          <div style="font-size:11px; color:#3498db; text-transform:uppercase; font-weight:800; letter-spacing:1px; margin-bottom:4px;">Daily Monitoring</div>
+          <h3 style="margin:0 0 8px; font-size:18px;"><i class="fas fa-file-medical" style="color:#3498db; margin-right:6px;"></i> Reports & Family</h3>
+          <p style="font-size:13px; color:var(--muted); line-height:1.5; margin:0 0 16px;">
+            Automatic daily reports emailed to authorized relative + shareable live health monitoring card.
+          </p>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <a href="/reports" style="padding:8px 16px; font-size:13px; font-weight:700; text-decoration:none; border-radius:8px; background:#3498db; color:#fff; display:inline-flex; align-items:center; gap:6px;">
+              <i class="fas fa-chart-bar"></i> View Reports
+            </a>
+            {% if current_user.is_authenticated %}
+            <a href="/family/{{ current_user.id }}" target="_blank" style="padding:8px 16px; font-size:13px; font-weight:700; text-decoration:none; border-radius:8px; background:rgba(255,255,255,0.06); color:var(--text); border:1px solid var(--border); display:inline-flex; align-items:center; gap:6px;">
+              <i class="fas fa-share-alt"></i> Family Card
+            </a>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- 25s Camera PPG Card -->
+        <div class="card" style="border-left: 4px solid #e74c3c; background: linear-gradient(135deg, rgba(231,76,60,0.12), rgba(255,255,255,0.02));">
+          <div style="font-size:11px; color:#e74c3c; text-transform:uppercase; font-weight:800; letter-spacing:1px; margin-bottom:4px;">Clinical Screening</div>
+          <h3 style="margin:0 0 8px; font-size:18px;"><i class="fas fa-heartbeat" style="color:#e74c3c; margin-right:6px;"></i> 25s Finger PPG Scan</h3>
+          <p style="font-size:13px; color:var(--muted); line-height:1.5; margin:0 0 16px;">
+            Smartphone camera PPG with 25s timer, SQI noise filtering, auto-doctor scheduling on abnormal pulse.
+          </p>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <a href="/heartrate" style="padding:8px 16px; font-size:13px; font-weight:700; text-decoration:none; border-radius:8px; background:#e74c3c; color:#fff; display:inline-flex; align-items:center; gap:6px;">
+              <i class="fas fa-play"></i> Start PPG Scan
+            </a>
+            <a href="/emergency" style="padding:8px 16px; font-size:13px; font-weight:700; text-decoration:none; border-radius:8px; background:rgba(231,76,60,0.15); color:#e74c3c; border:1px solid rgba(231,76,60,0.3); display:inline-flex; align-items:center; gap:6px;">
+              <i class="fas fa-ambulance"></i> SOS Call
+            </a>
+          </div>
+        </div>
+
+      </div>
+
 
       <!-- Risk Score Calculator -->
       <section class="card fade-in" style="margin-bottom:24px;">

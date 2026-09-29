@@ -143,6 +143,9 @@
         if (text.includes("lifestyle")) { speak("Opening lifestyle tips"); window.location.href = "/lifestyle"; return true; }
         if (text.includes("heart rate") || text.includes("check my heart")) { speak("Opening heart rate monitor"); window.location.href = "/heartrate"; return true; }
         if (text.includes("chat")) { speak("Opening AI assistant"); window.location.href = "/chat"; return true; }
+        if (text.includes("appointment") || text.includes("video call") || text.includes("video consult")) { speak("Opening your doctor appointments and video calls"); window.location.href = "/appointments"; return true; }
+        if (text.includes("doctor portal") || text.includes("doctor dashboard")) { speak("Opening doctor portal"); window.location.href = "/doctor"; return true; }
+        if (text.includes("report") && !text.includes("download") && !text.includes("email")) { speak("Opening your health reports"); window.location.href = "/reports"; return true; }
         
         // Actions
         if (text.includes("start prediction") || text.includes("check my risk")) {

@@ -278,13 +278,17 @@ def save_reading():
             user_id=current_user.id,
             trigger_bpm=bpm,
             status='pending',
-            doctor_name='Dr. Ramesh Kumar',
+            doctor_name='Dr. Jayanth Gowda',
             room_id=room_id,
-            notes=f"Auto-scheduled: Abnormal HR {bpm} BPM detected via {source} PPG."
+            notes=f"Auto-scheduled: Abnormal HR {round(bpm)} BPM detected via {source} PPG."
         )
         db.session.add(appt)
         db.session.commit()
         appointment_created = True
+        try:
+            send_doctor_appointment_email(appt, current_user)
+        except Exception as err:
+            print("Failed to dispatch doctor email on PPG trigger:", err)
 
     return jsonify({"status": "success", "is_abnormal": is_abnormal, "appointment_created": appointment_created})
 
@@ -360,6 +364,114 @@ def last_prediction():
             "quality": latest.signal_quality
         })
     return jsonify({"score": None, "level": None, "date": None})
+
+# ── Doctor Appointment Email & Video Auto-Join ─────────────────────────────
+DOCTOR_NOTIFICATION_EMAIL = "jayanthgowda1406@gmail.com"
+
+def send_doctor_appointment_email(appt, user):
+    doctor_email = DOCTOR_NOTIFICATION_EMAIL
+    if not app.config.get('MAIL_USERNAME'):
+        print("Mail username not configured, cannot send appointment email")
+        return False
+    try:
+        accept_join_url = f"http://127.0.0.1:5000/doctor/accept_and_join/{appt.room_id}"
+        video_url = f"http://127.0.0.1:5000/videochat/{appt.room_id}?role=doctor"
+        
+        msg = Message(
+            subject=f"🚨 URGENT: Doctor Appointment Request - Patient {user.full_name} ({round(appt.trigger_bpm)} BPM)",
+            recipients=[doctor_email]
+        )
+        msg.body = (
+            f"Dear Doctor,\n\n"
+            f"A patient has requested an urgent cardiology video consultation via PulseGuard AI.\n\n"
+            f"Patient Details:\n"
+            f"- Name: {user.full_name}\n"
+            f"- Age: {user.age} | Gender: {user.gender}\n"
+            f"- Phone: {user.phone}\n"
+            f"- Heart Rate: {round(appt.trigger_bpm)} BPM (Abnormal Reading)\n"
+            f"- Time: {appt.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"- Reason: {appt.notes}\n\n"
+            f"👉 TO ACCEPT AND AUTOMATICALLY START LIVE VIDEO CALL WITH PATIENT, CLICK HERE:\n"
+            f"{accept_join_url}\n\n"
+            f"(Once you click, the appointment status changes to Accepted and both doctor and patient video feeds turn ON automatically).\n"
+        )
+        msg.html = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0b0c10; color: #ffffff; padding: 25px; border-radius: 12px; border: 1px solid #1f2833;">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h2 style="color: #e74c3c; margin: 0; font-size: 22px;">🚨 URGENT: Doctor Video Consultation Request</h2>
+                <p style="color: #888888; font-size: 13px; margin-top: 5px;">PulseGuard AI &bull; Telecardiology Network</p>
+            </div>
+            
+            <div style="background: rgba(255,255,255,0.06); padding: 18px; border-radius: 10px; margin-bottom: 24px; border-left: 4px solid #e74c3c;">
+                <p style="margin: 6px 0; font-size: 15px;"><strong>Patient Name:</strong> {user.full_name}</p>
+                <p style="margin: 6px 0; font-size: 14px; color: #cccccc;"><strong>Age / Gender:</strong> {user.age} yrs &bull; {user.gender}</p>
+                <p style="margin: 6px 0; font-size: 14px; color: #cccccc;"><strong>Phone Number:</strong> {user.phone}</p>
+                <p style="margin: 8px 0 6px; font-size: 16px;"><strong>Detected Heart Rate:</strong> <span style="color: #e74c3c; font-weight: bold; font-size: 18px;">{round(appt.trigger_bpm)} BPM</span></p>
+                <p style="margin: 6px 0; font-size: 13px; color: #aaaaaa;"><strong>Timestamp:</strong> {appt.created_at.strftime('%Y-%m-%d %H:%M:%S')}</p>
+                <p style="margin: 6px 0; font-size: 13px; color: #aaaaaa;"><strong>Clinical Note:</strong> {appt.notes}</p>
+            </div>
+
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{accept_join_url}" style="background: #2ecc71; color: #ffffff; padding: 16px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 15px rgba(46,204,113,0.4);">
+                    👉 ACCEPT APPOINTMENT & START VIDEO CALL
+                </a>
+            </div>
+
+            <div style="background: rgba(46,204,113,0.1); border: 1px solid rgba(46,204,113,0.3); padding: 12px; border-radius: 8px; font-size: 12px; color: #2ecc71; text-align: center;">
+                ⚡ <strong>Automatic Connection:</strong> Clicking the link above marks the appointment as Accepted and automatically launches the video call with camera and microphone ON.
+            </div>
+
+            <p style="font-size: 11px; color: #666666; text-align: center; margin-top: 20px;">
+                Direct link: <a href="{accept_join_url}" style="color: #3498db;">{accept_join_url}</a>
+            </p>
+        </div>
+        """
+        mail.send(msg)
+        print(f"Appointment request email sent successfully to {doctor_email}")
+        return True
+    except Exception as e:
+        print(f"Error sending doctor appointment email: {e}")
+        return False
+
+@app.route('/doctor/accept_and_join/<room_id>')
+def doctor_accept_and_join(room_id):
+    from flask import redirect
+    appt = DoctorAppointment.query.filter_by(room_id=room_id).first()
+    if appt:
+        appt.status = 'accepted'
+        db.session.commit()
+    return redirect(f"/videochat/{room_id}?role=doctor")
+
+@app.route('/api/appointments/request_doctor', methods=['POST'])
+@login_required
+def request_doctor_appointment():
+    import secrets
+    data = request.json or {}
+    bpm = data.get('bpm')
+    if not bpm:
+        latest = HealthMeasurement.query.filter_by(user_id=current_user.id).order_by(HealthMeasurement.timestamp.desc()).first()
+        bpm = latest.bpm if latest else 78.0
+    
+    room_id = f"pulseguard-{current_user.id}-{secrets.token_hex(4)}"
+    appt = DoctorAppointment(
+        user_id=current_user.id,
+        trigger_bpm=float(bpm),
+        status='pending',
+        doctor_name='Dr. Jayanth Gowda',
+        room_id=room_id,
+        notes=f"Consultation requested by {current_user.full_name}. HR: {round(float(bpm))} BPM."
+    )
+    db.session.add(appt)
+    db.session.commit()
+    
+    email_sent = send_doctor_appointment_email(appt, current_user)
+    return jsonify({
+        "status": "success",
+        "appointment_id": appt.id,
+        "room_id": room_id,
+        "email_sent": email_sent,
+        "message": f"Appointment request sent to {DOCTOR_NOTIFICATION_EMAIL}! Once accepted, video chat will open automatically." if email_sent else "Appointment created, but email could not be sent (check SMTP settings)."
+    })
 
 # ── Appointments & Video Chat ──────────────────────────────────────────────
 @app.route('/appointments')

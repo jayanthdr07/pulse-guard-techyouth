@@ -20,18 +20,19 @@
       </div>
       <div class="nav-links">
         <a href="#home" class="active">Home</a>
-        <a href="#features">Features</a>
-        <a href="#prediction">Prediction</a>
-        <a href="#chatbot">AI Assistant</a>
-        <a href="/dashboard" style="color:#1db954;font-weight:700;">Dashboard</a> <a href="/heartrate"
-          class="nav-item"><i class="fas fa-heartbeat"></i><span>Heart Rate</span></a> <a href="/chat"
-          class="nav-item"><i class="fas fa-robot"></i><span>AI Assistant</span></a>
-        <a href="/lifestyle">Lifestyle</a>
-        <a href="/diet">Diet AI</a>
-        <a href="/emergency" style="color:#e74c3c;font-weight:700;">🚨 Emergency</a>
-                <a href="#contact">Contact</a>
+        <a href="/dashboard" style="color:#1db954;font-weight:700;"><i class="fas fa-chart-line"></i> Dashboard</a>
+        <a href="/heartrate"><i class="fas fa-heartbeat"></i> Heart Rate (PPG)</a>
+        <a href="/appointments" style="color:#2ecc71;font-weight:700;"><i class="fas fa-video"></i> Video Consult</a>
+        <a href="/doctor" style="color:#3498db;font-weight:700;"><i class="fas fa-user-md"></i> Doctor Portal</a>
+        <a href="/reports"><i class="fas fa-file-medical"></i> Reports</a>
+        <a href="/chat"><i class="fas fa-robot"></i> AI Chat</a>
+        <a href="/emergency" style="color:#e74c3c;font-weight:700;">🚨 SOS Emergency</a>
+        {% if current_user.is_authenticated %}
+        <a href="/logout" style="color:#e74c3c;font-weight:700;"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        {% else %}
         <a href="/login" style="color:var(--primary);font-weight:700;"><i class="fas fa-sign-in-alt"></i> Login</a>
-        <a href="/register" style="color:#fff;background:var(--primary);padding:5px 10px;border-radius:5px;"><i class="fas fa-user-plus"></i> Register</a>
+        <a href="/register" style="color:#fff;background:var(--primary);padding:6px 12px;border-radius:6px;font-weight:700;"><i class="fas fa-user-plus"></i> Register</a>
+        {% endif %}
       </div>
     </div>
   </nav>

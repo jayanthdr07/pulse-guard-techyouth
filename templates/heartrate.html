@@ -36,15 +36,27 @@
 <body>
 
 <aside class="pg-sidebar" id="sidebar">
-  <div class="sidebar-logo"><i class="fas fa-heartbeat logo-icon"></i><span class="logo-text">PulseGuard AI</span></div>
+  <div class="sidebar-logo">
+    <i class="fas fa-heartbeat logo-icon"></i>
+    <span class="logo-text">PulseGuard AI</span>
+  </div>
   <nav class="sidebar-nav">
-    <a href="/"           class="nav-item"><i class="fas fa-home"></i><span>Home</span></a>
-    <a href="/dashboard"  class="nav-item"><i class="fas fa-chart-line"></i><span>Dashboard</span></a>
-    <a href="/heartrate"  class="nav-item active"><i class="fas fa-heartbeat"></i><span>Heart Rate</span></a>`n    <a href="/chat" class="nav-item"><i class="fas fa-robot"></i><span>AI Assistant</span></a>
-    <a href="/lifestyle"  class="nav-item"><i class="fas fa-running"></i><span>Lifestyle</span></a>
-    <a href="/diet"       class="nav-item"><i class="fas fa-apple-alt"></i><span>Diet Analysis</span></a>
-    <a href="/emergency"  class="nav-item"><i class="fas fa-ambulance"></i><span>Emergency</span></a>
-    <a href="/#prediction" class="nav-item"><i class="fas fa-stethoscope"></i><span>Risk Prediction</span></a>
+    <a href="/" class="nav-item"><i class="fas fa-home"></i><span>Home</span></a>
+    <a href="/dashboard" class="nav-item "><i class="fas fa-chart-line"></i><span>Dashboard</span></a>
+    <a href="/heartrate" class="nav-item active"><i class="fas fa-heartbeat"></i><span>Heart Rate (PPG)</span></a>
+    <a href="/appointments" class="nav-item " style="color:#2ecc71;font-weight:600;"><i class="fas fa-video"></i><span>Doctor Video Call</span></a>
+    <a href="/doctor" class="nav-item " style="color:#3498db;font-weight:600;"><i class="fas fa-user-md"></i><span>Doctor Portal</span></a>
+    <a href="/reports" class="nav-item "><i class="fas fa-file-medical"></i><span>Reports & Family</span></a>
+    <a href="/chat" class="nav-item "><i class="fas fa-robot"></i><span>AI Assistant</span></a>
+    <a href="/lifestyle" class="nav-item "><i class="fas fa-running"></i><span>Lifestyle</span></a>
+    <a href="/diet" class="nav-item "><i class="fas fa-apple-alt"></i><span>Diet Analysis</span></a>
+    <a href="/emergency" class="nav-item "><i class="fas fa-ambulance"></i><span>Emergency</span></a>
+    {% if current_user.is_authenticated %}
+    <a href="/logout" class="nav-item" style="color:#e74c3c; margin-top:14px;"><i class="fas fa-sign-out-alt"></i><span>Logout ({{ current_user.full_name.split()[0] }})</span></a>
+    {% else %}
+    <a href="/login" class="nav-item" style="color:#2ecc71; margin-top:14px;"><i class="fas fa-sign-in-alt"></i><span>Login</span></a>
+    <a href="/register" class="nav-item"><i class="fas fa-user-plus"></i><span>Register</span></a>
+    {% endif %}
   </nav>
   <a href="/emergency" class="sidebar-sos"><i class="fas fa-exclamation-triangle"></i><span>SOS Emergency</span></a>
 </aside>
