@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <title>Video Consultation - PulseGuard AI</title>
+  <link rel="stylesheet" href="/static/pulseguard.css">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <style>
+    .video-container { width: 100%; height: 70vh; border-radius: 12px; overflow: hidden; background: #000; position: relative; }
+    .video-container iframe { width: 100%; height: 100%; border: none; }
+    .video-info { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; margin-top: 15px; }
+    .end-btn { display: inline-block; padding: 12px 25px; background: #e74c3c; color: #fff; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 16px; margin-top: 15px; }
+  </style>
+</head>
+<body>
+  <nav class="pg-nav">
+    <div class="nav-logo"><i class="fas fa-heartbeat"></i> PulseGuard AI</div>
+    <div class="nav-links">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/appointments">Appointments</a>
+      <a href="/logout">Logout</a>
+    </div>
+  </nav>
+
+  <main class="pg-main">
+    <h2><i class="fas fa-video"></i> Video Consultation</h2>
+    
+    {% if appointment %}
+    <div class="video-info" style="margin-bottom: 15px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+        <div>
+          <div style="font-weight: 700;"><i class="fas fa-user-md"></i> {{ appointment.doctor_name }}</div>
+          <div style="font-size: 13px; color: var(--muted); margin-top: 5px;">
+            Triggered HR: <b style="color: #e74c3c;">{{ appointment.trigger_bpm | round }} BPM</b> &bull; {{ appointment.notes }}
+          </div>
+        </div>
+        <div>
+          <span style="background: rgba(46,204,113,0.2); color: #2ecc71; padding: 5px 12px; border-radius: 12px; font-size: 12px; font-weight: 700;">LIVE</span>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="video-container">
+      <iframe 
+        allow="camera; microphone; fullscreen; display-capture; autoplay"
+        src="https://meet.jit.si/{{ room_id }}#config.prejoinConfig.enabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&interfaceConfig.SHOW_JITSI_WATERMARK=false&interfaceConfig.SHOW_WATERMARK_FOR_GUESTS=false"
+      ></iframe>
+    </div>
+
+    <div style="text-align: center;">
+      <button class="end-btn" onclick="endCall()"><i class="fas fa-phone-slash"></i> End Consultation</button>
+    </div>
+
+    <div class="video-info">
+      <h3 style="margin-top: 0;"><i class="fas fa-info-circle"></i> How it works</h3>
+      <ul style="font-size: 14px; color: var(--muted); line-height: 2;">
+        <li>Both you and the doctor join the same secure room automatically.</li>
+        <li>Grant camera & microphone permission when prompted.</li>
+        <li>Share this link with your doctor: <code id="room-link">{{ request.url }}</code>
+          <button onclick="navigator.clipboard.writeText(document.getElementById('room-link').textContent); alert('Copied!')" style="background: transparent; border: 1px solid var(--border); color: var(--text); padding: 3px 8px; border-radius: 5px; cursor: pointer; font-size: 12px; margin-left: 5px;"><i class="fas fa-copy"></i></button>
+        </li>
+        <li>The doctor can also access this room from the Doctor Dashboard at <code>/doctor</code>.</li>
+        <li>Click "End Consultation" when done to mark the appointment as completed.</li>
+      </ul>
+    </div>
+  </main>
+
+  <script>
+  function endCall() {
+      if (!confirm("End this consultation?")) return;
+      {% if appointment %}
+      fetch('/api/appointments/{{ appointment.id }}/complete', {method: 'POST'})
+          .then(() => { window.location.href = "/appointments"; });
+      {% else %}
+      window.location.href = "/appointments";
+      {% endif %}
+  }
+  </script>
+</body>
+</html>

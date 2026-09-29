@@ -556,6 +556,15 @@ function finishFingerPPG() {
         body: JSON.stringify({bpm: avgBpm, source: 'Finger', quality: ppgQuality})
     }).then(r => r.json()).then(data => {
         showToast("Measurement saved to your profile!", "success");
+        if (data.appointment_created) {
+            document.getElementById('finger-status-overlay').innerHTML = `⚠️ ${avgBpm} BPM — Abnormal! Doctor appointment scheduled.`;
+            showToast("⚠️ Abnormal HR detected! A doctor appointment has been automatically scheduled.", "error");
+            setTimeout(() => {
+                if (confirm("Your heart rate of " + avgBpm + " BPM is abnormal. A doctor appointment has been scheduled. View your appointments now?")) {
+                    window.location.href = "/appointments";
+                }
+            }, 1500);
+        }
     }).catch(e => showToast("Error saving measurement", "error"));
 }
 
@@ -684,5 +693,10 @@ function drawFingerWaveform() {
 }
 
 </script>
+
+{% if current_user.is_authenticated %}
+<script src="/static/voice.js"></script>
+{% endif %}
 </body>
+
 </html>

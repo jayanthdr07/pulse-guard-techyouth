@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <title>Doctor Dashboard - PulseGuard AI</title>
+  <link rel="stylesheet" href="/static/pulseguard.css">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <style>
+    .doc-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; margin-bottom: 15px; }
+    .accept-btn { padding: 10px 20px; background: #2ecc71; color: #fff; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px; }
+    .accept-btn:hover { background: #27ae60; }
+    .join-btn { padding: 10px 20px; background: #3498db; color: #fff; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px; text-decoration: none; }
+    .section-label { font-size: 18px; font-weight: 700; margin: 30px 0 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  </style>
+</head>
+<body>
+  <nav class="pg-nav">
+    <div class="nav-logo"><i class="fas fa-user-md"></i> PulseGuard — Doctor Portal</div>
+    <div class="nav-links">
+      <a href="/doctor" class="active">Dashboard</a>
+    </div>
+  </nav>
+
+  <main class="pg-main">
+    <h2><i class="fas fa-stethoscope"></i> Doctor Dashboard</h2>
+    <p style="color: var(--muted);">Review incoming patient appointments and join video consultations.</p>
+
+    <div class="section-label"><i class="fas fa-clock" style="color: #f39c12;"></i> Pending Appointments ({{ pending | length }})</div>
+    {% if pending %}
+      {% for a in pending %}
+      <div class="doc-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="font-weight: 700; font-size: 16px;"><i class="fas fa-user"></i> {{ a.patient.full_name }}</div>
+            <div style="font-size: 13px; color: var(--muted); margin-top: 5px;">
+              Age: {{ a.patient.age }} &bull; Phone: {{ a.patient.phone }} &bull; Email: {{ a.patient.email }}
+            </div>
+            <div style="font-size: 14px; margin-top: 8px;">
+              <span style="color: #e74c3c; font-weight: 700;">Abnormal HR: {{ a.trigger_bpm | round }} BPM</span>
+              &bull; {{ a.created_at.strftime('%Y-%m-%d %H:%M') }}
+            </div>
+            <div style="font-size: 13px; color: var(--muted); margin-top: 3px;">{{ a.notes }}</div>
+          </div>
+          <div>
+            <button class="accept-btn" onclick="acceptAppt({{ a.id }})"><i class="fas fa-check"></i> Accept & Open Video</button>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="text-align: center; padding: 30px; color: var(--muted);">No pending appointments.</div>
+    {% endif %}
+
+    <div class="section-label"><i class="fas fa-video" style="color: #2ecc71;"></i> Accepted — Ready for Call ({{ accepted | length }})</div>
+    {% if accepted %}
+      {% for a in accepted %}
+      <div class="doc-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="font-weight: 700; font-size: 16px;"><i class="fas fa-user"></i> {{ a.patient.full_name }}</div>
+            <div style="font-size: 14px; margin-top: 5px;">
+              <span style="color: #e74c3c;">HR: {{ a.trigger_bpm | round }} BPM</span> &bull; {{ a.created_at.strftime('%Y-%m-%d %H:%M') }}
+            </div>
+          </div>
+          <div>
+            <a href="/videochat/{{ a.room_id }}" class="join-btn"><i class="fas fa-video"></i> Join Video Call</a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="text-align: center; padding: 30px; color: var(--muted);">No accepted appointments yet.</div>
+    {% endif %}
+  </main>
+
+  <script>
+  function acceptAppt(id) {
+      fetch(`/api/appointments/${id}/accept`, {method: 'POST'})
+          .then(r => r.json())
+          .then(data => {
+              if (data.room_id) {
+                  window.location.href = `/videochat/${data.room_id}`;
+              } else {
+                  location.reload();
+              }
+          });
+  }
+  </script>
+</body>
+</html>

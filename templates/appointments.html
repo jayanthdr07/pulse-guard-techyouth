@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <title>My Appointments - PulseGuard AI</title>
+  <link rel="stylesheet" href="/static/pulseguard.css">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <style>
+    .appt-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; margin-bottom: 15px; border-left: 4px solid #555; }
+    .appt-card.pending { border-left-color: #f39c12; }
+    .appt-card.accepted { border-left-color: #2ecc71; }
+    .appt-card.completed { border-left-color: #3498db; }
+    .appt-card.cancelled { border-left-color: #e74c3c; }
+    .status-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+    .status-pending { background: rgba(243,156,18,0.2); color: #f39c12; }
+    .status-accepted { background: rgba(46,204,113,0.2); color: #2ecc71; }
+    .status-completed { background: rgba(52,152,219,0.2); color: #3498db; }
+    .status-cancelled { background: rgba(231,76,60,0.2); color: #e74c3c; }
+    .join-btn { display: inline-block; padding: 10px 20px; background: #2ecc71; color: #fff; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; text-decoration: none; font-size: 14px; transition: 0.3s; }
+    .join-btn:hover { background: #27ae60; }
+    .cancel-btn { display: inline-block; padding: 8px 15px; background: transparent; color: #e74c3c; border: 1px solid #e74c3c; border-radius: 8px; font-size: 13px; cursor: pointer; margin-left: 10px; }
+  </style>
+</head>
+<body>
+  <nav class="pg-nav">
+    <div class="nav-logo"><i class="fas fa-heartbeat"></i> PulseGuard AI</div>
+    <div class="nav-links">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/heartrate">Measure</a>
+      <a href="/reports">Reports</a>
+      <a href="/appointments" class="active">Appointments</a>
+      <a href="/logout">Logout</a>
+    </div>
+  </nav>
+
+  <main class="pg-main">
+    <h2><i class="fas fa-calendar-check"></i> My Doctor Appointments</h2>
+    <p style="color: var(--muted); margin-bottom: 20px;">Appointments are automatically created when an abnormal heart rate is detected during PPG measurement.</p>
+
+    {% if appointments %}
+      {% for a in appointments %}
+      <div class="appt-card {{ a.status }}">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="font-weight: 700; font-size: 16px;"><i class="fas fa-user-md"></i> {{ a.doctor_name }}</div>
+            <div style="font-size: 13px; color: var(--muted); margin-top: 5px;">
+              Triggered by HR: <b style="color: #e74c3c;">{{ a.trigger_bpm | round }} BPM</b> &bull; {{ a.created_at.strftime('%Y-%m-%d %H:%M') }}
+            </div>
+            <div style="font-size: 13px; color: var(--muted); margin-top: 3px;">{{ a.notes }}</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span class="status-badge status-{{ a.status }}">{{ a.status }}</span>
+            {% if a.status == 'accepted' %}
+              <a href="/videochat/{{ a.room_id }}" class="join-btn"><i class="fas fa-video"></i> Join Video Call</a>
+            {% endif %}
+            {% if a.status == 'pending' %}
+              <button class="cancel-btn" onclick="cancelAppt({{ a.id }})"><i class="fas fa-times"></i> Cancel</button>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="text-align: center; padding: 40px; color: var(--muted);">
+        <i class="fas fa-calendar-check" style="font-size: 48px; margin-bottom: 15px; display: block;"></i>
+        No appointments yet. Appointments are auto-created when abnormal HR is detected.
+      </div>
+    {% endif %}
+  </main>
+
+  <script>
+  function cancelAppt(id) {
+      if (!confirm("Cancel this appointment?")) return;
+      fetch(`/api/appointments/${id}/cancel`, {method: 'POST'})
+          .then(r => r.json())
+          .then(() => location.reload());
+  }
+  </script>
+
+{% if current_user.is_authenticated %}
+<script src="/static/voice.js"></script>
+{% endif %}
+</body>
+</html>

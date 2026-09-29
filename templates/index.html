@@ -603,6 +603,11 @@
       <i class="fas fa-ambulance"></i>Emergency</a>
   </div>
 
+
+{% if current_user.is_authenticated %}
+<script src="/static/voice.js"></script>
+{% endif %}
 </body>
+
 
 </html>

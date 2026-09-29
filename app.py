@@ -135,6 +135,17 @@ class SymptomLog(db.Model):
     symptom = db.Column(db.Text, nullable=False)
     nlp_context = db.Column(db.Text)
 
+class DoctorAppointment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    trigger_bpm = db.Column(db.Float)
+    status = db.Column(db.String(20), default='pending')  # pending, accepted, completed, cancelled
+    doctor_name = db.Column(db.String(100), default='Dr. Ramesh Kumar')
+    room_id = db.Column(db.String(50))
+    notes = db.Column(db.Text)
+    patient = db.relationship('User', backref='appointments')
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
@@ -257,7 +268,25 @@ def save_reading():
     measurement = HealthMeasurement(user_id=current_user.id, bpm=bpm, source=source, signal_quality=quality, is_abnormal=is_abnormal)
     db.session.add(measurement)
     db.session.commit()
-    return jsonify({"status": "success"})
+
+    appointment_created = False
+    if is_abnormal:
+        # Auto-schedule a doctor appointment
+        import secrets
+        room_id = f"pulseguard-{current_user.id}-{secrets.token_hex(4)}"
+        appt = DoctorAppointment(
+            user_id=current_user.id,
+            trigger_bpm=bpm,
+            status='pending',
+            doctor_name='Dr. Ramesh Kumar',
+            room_id=room_id,
+            notes=f"Auto-scheduled: Abnormal HR {bpm} BPM detected via {source} PPG."
+        )
+        db.session.add(appt)
+        db.session.commit()
+        appointment_created = True
+
+    return jsonify({"status": "success", "is_abnormal": is_abnormal, "appointment_created": appointment_created})
 
 @app.route('/reports')
 @login_required
@@ -273,6 +302,115 @@ def family_card(token):
         return "Invalid link", 404
     latest = HealthMeasurement.query.filter_by(user_id=user.id).order_by(HealthMeasurement.timestamp.desc()).first()
     return render_template('family_card.html', user=user, latest=latest)
+
+
+# ── Background Task: Daily/Weekly Reports ──────────────────────────────────
+def generate_reports():
+    with app.app_context():
+        users = User.query.all()
+        for user in users:
+            measurements = HealthMeasurement.query.filter_by(user_id=user.id).all()
+            if measurements:
+                avg_hr = sum(m.bpm for m in measurements) / len(measurements)
+                abnorms = sum(1 for m in measurements if m.is_abnormal)
+                report = Report(user_id=user.id, period="Daily", avg_hr=avg_hr, abnormal_count=abnorms, summary_text="Daily summary generated automatically.")
+                db.session.add(report)
+                db.session.commit()
+                # Email to relative
+                if user.relative_email and app.config['MAIL_USERNAME']:
+                    try:
+                        share_url = f"http://127.0.0.1:5000/family/{user.id}"
+                        msg = Message(f"PulseGuard Daily Report for {user.full_name}", recipients=[user.relative_email])
+                        msg.body = f"Avg HR: {avg_hr:.1f} BPM. Abnormal Readings: {abnorms}. View live monitoring here: {share_url}"
+                        mail.send(msg)
+                    except Exception as e:
+                        print("Email failed", e)
+
+scheduler.add_job(func=generate_reports, trigger="interval", hours=24)
+
+@app.route('/api/health/share_card', methods=['POST'])
+@login_required
+def share_card():
+    user = current_user
+    if user.relative_email and app.config['MAIL_USERNAME']:
+        try:
+            share_url = f"http://127.0.0.1:5000/family/{user.id}"
+            msg = Message(f"PulseGuard Family Access for {user.full_name}", recipients=[user.relative_email])
+            msg.body = f"Hello {user.relative_name},\n\nYou have been granted access to monitor {user.full_name}'s health via PulseGuard.\n\nAccess the live Family Health Card here: {share_url}"
+            mail.send(msg)
+            return jsonify({"status": "success", "message": "Email sent to relative!"})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 400
+    return jsonify({"error": "Relative email not configured."}), 400
+
+
+
+@app.route('/api/me/last-prediction')
+@login_required
+def last_prediction():
+    latest = HealthMeasurement.query.filter_by(user_id=current_user.id).order_by(HealthMeasurement.timestamp.desc()).first()
+    if latest:
+        level = "Normal"
+        if latest.bpm < 50 or latest.bpm > 100:
+            level = "Abnormal"
+        return jsonify({
+            "score": round(latest.bpm),
+            "level": level,
+            "date": latest.timestamp.strftime('%Y-%m-%d %H:%M'),
+            "quality": latest.signal_quality
+        })
+    return jsonify({"score": None, "level": None, "date": None})
+
+# ── Appointments & Video Chat ──────────────────────────────────────────────
+@app.route('/appointments')
+@login_required
+def appointments_page():
+    appts = DoctorAppointment.query.filter_by(user_id=current_user.id).order_by(DoctorAppointment.created_at.desc()).all()
+    return render_template('appointments.html', appointments=appts)
+
+@app.route('/api/appointments', methods=['GET'])
+@login_required
+def get_appointments():
+    appts = DoctorAppointment.query.filter_by(user_id=current_user.id).order_by(DoctorAppointment.created_at.desc()).all()
+    return jsonify([{
+        "id": a.id, "status": a.status, "doctor": a.doctor_name,
+        "bpm": a.trigger_bpm, "room_id": a.room_id,
+        "created": a.created_at.strftime('%Y-%m-%d %H:%M'), "notes": a.notes
+    } for a in appts])
+
+@app.route('/api/appointments/<int:appt_id>/accept', methods=['POST'])
+def accept_appointment(appt_id):
+    appt = DoctorAppointment.query.get_or_404(appt_id)
+    appt.status = 'accepted'
+    db.session.commit()
+    return jsonify({"status": "accepted", "room_id": appt.room_id})
+
+@app.route('/api/appointments/<int:appt_id>/complete', methods=['POST'])
+@login_required
+def complete_appointment(appt_id):
+    appt = DoctorAppointment.query.get_or_404(appt_id)
+    appt.status = 'completed'
+    db.session.commit()
+    return jsonify({"status": "completed"})
+
+@app.route('/api/appointments/<int:appt_id>/cancel', methods=['POST'])
+@login_required
+def cancel_appointment(appt_id):
+    appt = DoctorAppointment.query.get_or_404(appt_id)
+    appt.status = 'cancelled'
+    db.session.commit()
+    return jsonify({"status": "cancelled"})
+
+@app.route('/videochat/<room_id>')
+def videochat(room_id):
+    appt = DoctorAppointment.query.filter_by(room_id=room_id).first()
+    return render_template('videochat.html', room_id=room_id, appointment=appt)
+
+@app.route('/doctor')
+def doctor_dashboard():
+    pending = DoctorAppointment.query.filter_by(status='pending').order_by(DoctorAppointment.created_at.desc()).all()
+    accepted = DoctorAppointment.query.filter_by(status='accepted').order_by(DoctorAppointment.created_at.desc()).all()
+    return render_template('doctor_dashboard.html', pending=pending, accepted=accepted)
 
 @app.route("/")
 def home():

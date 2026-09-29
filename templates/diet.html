@@ -320,5 +320,10 @@ async function analyzeFood(){
   }
 }
 </script>
+
+{% if current_user.is_authenticated %}
+<script src="/static/voice.js"></script>
+{% endif %}
 </body>
+
 </html>

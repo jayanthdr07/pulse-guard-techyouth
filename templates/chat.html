@@ -259,5 +259,10 @@ function clearChat() {
   addMsg('ai', '<p>🔄 Chat cleared! How can I help you with your health today?</p>');
 }
 </script>
+
+{% if current_user.is_authenticated %}
+<script src="/static/voice.js"></script>
+{% endif %}
 </body>
+
 </html>
