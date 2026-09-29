@@ -454,6 +454,7 @@ requestAnimationFrame(function tick(){
 });
 
 // ── Finger PPG Logic ────────────────────────────────────────────────────────
+
 let fingerStream = null;
 let fingerVideo = document.getElementById('finger-video');
 let fingerCanvas = document.getElementById('finger-process-canvas');
@@ -464,6 +465,8 @@ let fingerRunning = false;
 let fingerRedData = [];
 let fingerTimestamps = [];
 let fingerBpmList = [];
+let ppgStartTime = null;
+let ppgQuality = 'Poor';
 
 async function startFingerPPG() {
   if (!fingerCtx || !fingerWaveCtx) return;
@@ -491,8 +494,14 @@ async function startFingerPPG() {
     fingerTimestamps = [];
     fingerBpmList = [];
     document.getElementById('finger-bpm-val').textContent = '--';
+    ppgStartTime = performance.now();
     
     requestAnimationFrame(processFingerFrame);
+    
+    // 25 second timer
+    setTimeout(() => {
+        if(fingerRunning) finishFingerPPG();
+    }, 25000);
     
   } catch(e) {
     showToast('Camera access denied for Finger PPG', 'error');
@@ -512,6 +521,42 @@ function stopFingerPPG() {
   document.getElementById('stop-finger-btn').style.display = 'none';
   document.getElementById('finger-status-overlay').style.display = 'flex';
   document.getElementById('finger-status-overlay').innerHTML = 'Stopped';
+}
+
+function finishFingerPPG() {
+    stopFingerPPG();
+    if(fingerBpmList.length === 0) {
+        showToast("Measurement failed. Please try again.", "error");
+        return;
+    }
+    let avgBpm = Math.round(fingerBpmList.reduce((a,b)=>a+b,0) / fingerBpmList.length);
+    
+    // Simple SQI: Check variance
+    let variance = 0;
+    if(fingerRedData.length > 0) {
+        let mean = fingerRedData.reduce((a,b)=>a+b,0)/fingerRedData.length;
+        variance = fingerRedData.reduce((a,b)=>a+Math.pow(b-mean,2),0)/fingerRedData.length;
+    }
+    if (variance < 10) ppgQuality = 'Poor';
+    else if (variance < 50) ppgQuality = 'Fair';
+    else ppgQuality = 'Good';
+
+    if (ppgQuality === 'Poor') {
+        showToast("Signal quality too poor. Please press firmly and try again.", "error");
+        document.getElementById('finger-status-overlay').innerHTML = 'Poor Quality. Try Again.';
+        return;
+    }
+    
+    document.getElementById('finger-status-overlay').innerHTML = `Finished: ${avgBpm} BPM (${ppgQuality})`;
+    
+    // Save to DB
+    fetch('/api/health/save_reading', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({bpm: avgBpm, source: 'Finger', quality: ppgQuality})
+    }).then(r => r.json()).then(data => {
+        showToast("Measurement saved to your profile!", "success");
+    }).catch(e => showToast("Error saving measurement", "error"));
 }
 
 function processFingerFrame(now) {
@@ -548,9 +593,15 @@ function processFingerFrame(now) {
   detectFingerBPM();
   drawFingerWaveform();
   
+  // Update progress
+  let elapsed = now - ppgStartTime;
+  if(elapsed < 25000) {
+      document.getElementById('finger-status-overlay').style.display = 'flex';
+      document.getElementById('finger-status-overlay').innerHTML = `Measuring... ${Math.round(25 - elapsed/1000)}s remaining`;
+  }
+  
   requestAnimationFrame(processFingerFrame);
 }
-
 function detectFingerBPM() {
   if (fingerRedData.length < 60) return;
   

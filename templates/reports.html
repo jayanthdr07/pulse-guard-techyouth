@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <title>Health Reports - PulseGuard AI</title>
+  <link rel="stylesheet" href="/static/pulseguard.css">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+  <nav class="pg-nav">
+    <div class="nav-logo"><i class="fas fa-heartbeat"></i> PulseGuard AI</div>
+    <div class="nav-links">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/heartrate">Measure</a>
+      <a href="/reports" class="active">Reports</a>
+      <a href="/logout">Logout</a>
+    </div>
+  </nav>
+
+  <main class="pg-main">
+    <h2><i class="fas fa-file-medical"></i> Health History & Reports</h2>
+    
+    <div class="grid-2">
+      <!-- Measurements -->
+      <div class="card">
+        <h3>Recent Measurements</h3>
+        <table style="width:100%; text-align:left; border-collapse:collapse; margin-top: 10px;">
+          <tr><th>Time</th><th>BPM</th><th>Quality</th><th>Status</th></tr>
+          {% for m in measurements %}
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 10px 0;">{{ m.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td><b>{{ m.bpm | round }}</b></td>
+            <td>{{ m.signal_quality }}</td>
+            <td>{% if m.is_abnormal %}<span style="color:var(--danger)">Flagged</span>{% else %}<span style="color:var(--primary)">Normal</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+
+      <!-- Generated Reports -->
+      <div class="card">
+        <h3>Automated Reports</h3>
+        <p style="font-size: 13px; color: var(--muted);">These reports are automatically generated and emailed to your authorized relative.</p>
+        <div style="display:flex; flex-direction:column; gap: 10px;">
+          {% for r in reports %}
+          <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px;">
+            <div style="font-weight: 600;">{{ r.period }} Report - {{ r.generated_at.strftime('%Y-%m-%d') }}</div>
+            <div style="font-size: 13px; margin-top: 5px;">Avg HR: {{ r.avg_hr | round(1) }} | Abnormalities: {{ r.abnormal_count }}</div>
+            <div style="font-size: 13px; color: var(--muted); margin-top: 5px;">{{ r.summary_text }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

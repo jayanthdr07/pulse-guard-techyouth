@@ -194,117 +194,31 @@ AMBULANCE_BASES = [
 #  PAGE ROUTES
 # ══════════════════════════════════════════════════════════════════════════════
 
-# ── Authentication Routes ──────────────────────────────────────────────────
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        from flask import redirect, url_for, flash
-        full_name = request.form.get('full_name')
-        phone = request.form.get('phone')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        age = request.form.get('age')
-        gender = request.form.get('gender')
-        relative_name = request.form.get('relative_name')
-        relative_phone = request.form.get('relative_phone')
-        relative_email = request.form.get('relative_email')
-
-        hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
-        user = User(
-            full_name=full_name, phone=phone, email=email, password=hashed_pw,
-            age=age, gender=gender, relative_name=relative_name, 
-            relative_phone=relative_phone, relative_email=relative_email
-        )
-        db.session.add(user)
-        try:
-            db.session.commit()
-            return redirect(url_for('login'))
-        except Exception as e:
-            db.session.rollback()
-            return f"Error: {e}"
-    return render_template('register.html')
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        from flask import redirect, url_for, flash
-        email = request.form.get('email')
-        password = request.form.get('password')
-        user = User.query.filter_by(email=email).first()
-        if user and bcrypt.check_password_hash(user.password, password):
-            login_user(user)
-            return redirect(url_for('dashboard'))
-        else:
-            return "Login Unsuccessful. Please check email and password."
-    return render_template('login.html')
-
-@app.route('/logout')
-@login_required
-def logout():
-    from flask import redirect, url_for
-    logout_user()
-    return redirect(url_for('login'))
-
-# ── Health Measurements & Reports ──────────────────────────────────────────
-@app.route('/api/health/save_reading', methods=['POST'])
-@login_required
-def save_reading():
-    data = request.json
-    bpm = data.get('bpm')
-    source = data.get('source', 'Unknown')
-    quality = data.get('quality', 'Good')
-    is_abnormal = bpm < 50 or bpm > 100
-    measurement = HealthMeasurement(user_id=current_user.id, bpm=bpm, source=source, signal_quality=quality, is_abnormal=is_abnormal)
-    db.session.add(measurement)
-    db.session.commit()
-    return jsonify({"status": "success"})
-
-@app.route('/reports')
-@login_required
-def reports():
-    measurements = HealthMeasurement.query.filter_by(user_id=current_user.id).order_by(HealthMeasurement.timestamp.desc()).limit(50).all()
-    user_reports = Report.query.filter_by(user_id=current_user.id).order_by(Report.generated_at.desc()).all()
-    return render_template('reports.html', measurements=measurements, reports=user_reports)
-
-@app.route('/family/<token>')
-def family_card(token):
-    user = User.query.get(int(token))
-    if not user:
-        return "Invalid link", 404
-    latest = HealthMeasurement.query.filter_by(user_id=user.id).order_by(HealthMeasurement.timestamp.desc()).first()
-    return render_template('family_card.html', user=user, latest=latest)
-
 @app.route("/")
 def home():
     return render_template("index.html")
 
 @app.route("/dashboard")
-@login_required
 def dashboard():
     return render_template("dashboard.html")
 
 @app.route("/lifestyle")
-@login_required
 def lifestyle():
     return render_template("lifestyle.html")
 
 @app.route("/diet")
-@login_required
 def diet():
     return render_template("diet.html")
 
 @app.route("/emergency")
-@login_required
 def emergency():
     return render_template("emergency.html")
 
 @app.route("/heartrate")
-@login_required
 def heartrate():
     return render_template("heartrate.html")
 
 @app.route("/chat")
-@login_required
 def chat():
     return render_template("chat.html")
 
