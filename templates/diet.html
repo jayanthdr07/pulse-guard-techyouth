@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>PulseGuard AI — Diet Analysis</title>
+  <meta name="description" content="AI-powered diet analysis for cardiovascular health — classify food, estimate calories, and get heart-healthy tips."/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <link rel="stylesheet" href="/static/pulseguard.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<aside class="pg-sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <i class="fas fa-heartbeat logo-icon"></i>
+    <span class="logo-text">PulseGuard AI</span>
+  </div>
+  <nav class="sidebar-nav">
+    <a href="/"          class="nav-item"><i class="fas fa-home"></i><span>Home</span></a>
+    <a href="/dashboard" class="nav-item"><i class="fas fa-chart-line"></i><span>Dashboard</span></a>`n    <a href="/heartrate" class="nav-item"><i class="fas fa-heartbeat"></i><span>Heart Rate</span></a>`n    <a href="/chat" class="nav-item"><i class="fas fa-robot"></i><span>AI Assistant</span></a>
+    <a href="/lifestyle" class="nav-item"><i class="fas fa-running"></i><span>Lifestyle</span></a>
+    <a href="/diet"      class="nav-item active"><i class="fas fa-apple-alt"></i><span>Diet Analysis</span></a>
+    <a href="/emergency" class="nav-item"><i class="fas fa-ambulance"></i><span>Emergency</span></a>
+    <a href="/#prediction" class="nav-item"><i class="fas fa-stethoscope"></i><span>Risk Prediction</span></a>
+  </nav>
+  <a href="/emergency" class="sidebar-sos"><i class="fas fa-exclamation-triangle"></i><span>SOS Emergency</span></a>
+</aside>
+
+<main class="pg-main">
+  <header class="pg-header">
+    <div>
+      <h1>Diet Analysis</h1>
+      <div class="header-sub">AI-powered food classification for heart health</div>
+    </div>
+    <a href="/dashboard" style="color:var(--muted);text-decoration:none;font-size:13px;"><i class="fas fa-arrow-left"></i> Dashboard</a>`n    <a href="/heartrate" class="nav-item"><i class="fas fa-heartbeat"></i><span>Heart Rate</span></a>`n    <a href="/chat" class="nav-item"><i class="fas fa-robot"></i><span>AI Assistant</span></a>
+  </header>
+
+  <div class="pg-content">
+
+    <div class="grid-2 fade-in" style="margin-bottom:24px;">
+
+      <!-- Input card -->
+      <div class="card">
+        <div class="section-title"><i class="fas fa-search"></i> Analyze Your Meal</div>
+
+        <!-- Image upload -->
+        <div style="margin-bottom:20px;">
+          <label class="pg-label">Upload Food Photo (optional)</label>
+          <div id="drop-zone" style="border:2px dashed var(--card-border);border-radius:var(--radius-sm);padding:30px;text-align:center;cursor:pointer;transition:all 0.3s;position:relative;"
+               ondragover="event.preventDefault();this.style.borderColor='var(--primary)'"
+               ondragleave="this.style.borderColor='var(--card-border)'"
+               ondrop="handleDrop(event)">
+            <i class="fas fa-cloud-upload-alt" style="font-size:36px;color:var(--muted);display:block;margin-bottom:8px;"></i>
+            <div style="color:var(--muted);font-size:14px;">Drag & drop or click to upload</div>
+            <input type="file" id="food-image" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;"
+                   onchange="previewImage(this)"/>
+          </div>
+          <img id="food-preview" class="food-img-preview" alt="Food preview"/>
+        </div>
+
+        <!-- Food name input -->
+        <div style="margin-bottom:20px;">
+          <label class="pg-label">Food Name / Description</label>
+          <input type="text" id="food-name" class="pg-input"
+                 placeholder="e.g., grilled chicken salad, samosa, pizza, oats..."
+                 onkeydown="if(event.key==='Enter')analyzeFood()"/>
+          <div style="font-size:12px;color:var(--muted);margin-top:6px;">Type what you're eating or what the photo shows</div>
+        </div>
+
+        <button class="pg-btn pg-btn-primary" onclick="analyzeFood()" style="width:100%;" id="analyze-btn">
+          <i class="fas fa-microscope"></i> Analyze Food
+        </button>
+
+        <!-- Quick food chips -->
+        <div style="margin-top:18px;">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Quick examples:</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            <button class="pg-btn pg-btn-outline" style="padding:6px 14px;font-size:12px;border-radius:20px;" onclick="quickAnalyze('oats with fruits')">Oats</button>
+            <button class="pg-btn pg-btn-outline" style="padding:6px 14px;font-size:12px;border-radius:20px;" onclick="quickAnalyze('pizza')">Pizza</button>
+            <button class="pg-btn pg-btn-outline" style="padding:6px 14px;font-size:12px;border-radius:20px;" onclick="quickAnalyze('dal rice sabzi')">Dal Rice</button>
+            <button class="pg-btn pg-btn-outline" style="padding:6px 14px;font-size:12px;border-radius:20px;" onclick="quickAnalyze('burger with fries')">Burger+Fries</button>
+            <button class="pg-btn pg-btn-outline" style="padding:6px 14px;font-size:12px;border-radius:20px;" onclick="quickAnalyze('grilled chicken salad')">Chicken Salad</button>
+            <button class="pg-btn pg-btn-outline" style="padding:6px 14px;font-size:12px;border-radius:20px;" onclick="quickAnalyze('samosa')">Samosa</button>
+            <button class="pg-btn pg-btn-outline" style="padding:6px 14px;font-size:12px;border-radius:20px;" onclick="quickAnalyze('banana and apple')">Fruits</button>
+            <button class="pg-btn pg-btn-outline" style="padding:6px 14px;font-size:12px;border-radius:20px;" onclick="quickAnalyze('idli dosa')">Idli/Dosa</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Result card -->
+      <div>
+        <div class="card" id="result-card" style="display:none;">
+          <div class="section-title"><i class="fas fa-poll"></i> Analysis Result</div>
+          <div class="food-result" id="food-result-box">
+            <div style="font-size:48px;" id="food-emoji">🍽️</div>
+            <div class="food-category" id="food-category">—</div>
+            <div class="food-calories" id="food-calories">—</div>
+            <div class="food-feedback" id="food-feedback">—</div>
+            <div class="food-tip" id="food-tip">—</div>
+          </div>
+
+          <!-- Nutritional breakdown chart -->
+          <div style="margin-top:20px;">
+            <div class="card-title" style="margin-bottom:12px;">Estimated Nutritional Impact</div>
+            <div style="position:relative;height:180px;"><canvas id="nutritionChart"></canvas></div>
+          </div>
+
+          <!-- Heart impact meter -->
+          <div style="margin-top:18px;">
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;">
+              <span style="color:var(--muted);">Heart Impact</span>
+              <span id="heart-impact-label" style="font-weight:600;">—</span>
+            </div>
+            <div style="height:10px;background:var(--darker);border-radius:5px;overflow:hidden;">
+              <div id="heart-impact-bar" style="height:100%;border-radius:5px;width:0%;transition:width 0.7s ease,background 0.3s;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Placeholder when no result -->
+        <div class="card" id="result-placeholder" style="text-align:center;padding:60px 24px;">
+          <i class="fas fa-apple-alt" style="font-size:60px;color:var(--muted);display:block;margin-bottom:16px;"></i>
+          <div style="font-size:18px;font-weight:600;margin-bottom:8px;">No food analyzed yet</div>
+          <div style="color:var(--muted);font-size:14px;">Enter a food name or upload a photo and click Analyze</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Heart-healthy diet plan -->
+    <div class="card fade-in" style="margin-bottom:24px;">
+      <div class="section-title"><i class="fas fa-heart"></i> Heart-Healthy Daily Diet Plan</div>
+      <div class="grid-4">
+        <div style="background:var(--darker);border-radius:var(--radius-sm);padding:16px;border:1px solid var(--card-border);">
+          <div style="font-size:22px;margin-bottom:8px;">🌅</div>
+          <div style="font-weight:700;color:var(--primary);margin-bottom:8px;">Breakfast</div>
+          <ul style="list-style:none;font-size:13px;color:var(--muted);line-height:2;">
+            <li>• Oats with berries</li><li>• 2 egg whites</li>
+            <li>• Green tea / black coffee</li><li>• Banana</li>
+          </ul>
+        </div>
+        <div style="background:var(--darker);border-radius:var(--radius-sm);padding:16px;border:1px solid var(--card-border);">
+          <div style="font-size:22px;margin-bottom:8px;">☀️</div>
+          <div style="font-weight:700;color:var(--warning);margin-bottom:8px;">Lunch</div>
+          <ul style="list-style:none;font-size:13px;color:var(--muted);line-height:2;">
+            <li>• Brown rice / jowar roti</li><li>• Dal / rajma / chana</li>
+            <li>• Mixed vegetables sabzi</li><li>• Buttermilk (low-fat)</li>
+          </ul>
+        </div>
+        <div style="background:var(--darker);border-radius:var(--radius-sm);padding:16px;border:1px solid var(--card-border);">
+          <div style="font-size:22px;margin-bottom:8px;">🌤️</div>
+          <div style="font-weight:700;color:var(--info);margin-bottom:8px;">Snack</div>
+          <ul style="list-style:none;font-size:13px;color:var(--muted);line-height:2;">
+            <li>• Mixed nuts (handful)</li><li>• Fruit salad</li>
+            <li>• Sprouts chaat</li><li>• Herbal tea</li>
+          </ul>
+        </div>
+        <div style="background:var(--darker);border-radius:var(--radius-sm);padding:16px;border:1px solid var(--card-border);">
+          <div style="font-size:22px;margin-bottom:8px;">🌙</div>
+          <div style="font-weight:700;color:var(--accent);margin-bottom:8px;">Dinner</div>
+          <ul style="list-style:none;font-size:13px;color:var(--muted);line-height:2;">
+            <li>• 2 whole wheat rotis</li><li>• Grilled fish / paneer</li>
+            <li>• Salad with olive oil</li><li>• Warm milk (low-fat)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Foods to avoid -->
+    <div class="grid-2 fade-in">
+      <div class="card">
+        <div class="section-title" style="font-size:16px;"><i class="fas fa-times-circle" style="color:var(--danger);"></i> Foods to Avoid</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          <span class="badge badge-high">Trans fats</span>
+          <span class="badge badge-high">Processed meats</span>
+          <span class="badge badge-high">Deep fried foods</span>
+          <span class="badge badge-high">Excess salt</span>
+          <span class="badge badge-medium">Red meat (daily)</span>
+          <span class="badge badge-medium">White bread</span>
+          <span class="badge badge-medium">Sugary drinks</span>
+          <span class="badge badge-medium">Refined sugar</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-title" style="font-size:16px;"><i class="fas fa-check-circle" style="color:var(--primary);"></i> Heart Superfoods</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          <span class="badge badge-low">Walnuts</span>
+          <span class="badge badge-low">Fatty fish</span>
+          <span class="badge badge-low">Berries</span>
+          <span class="badge badge-low">Olive oil</span>
+          <span class="badge badge-low">Leafy greens</span>
+          <span class="badge badge-low">Oats</span>
+          <span class="badge badge-low">Legumes</span>
+          <span class="badge badge-low">Dark chocolate</span>
+          <span class="badge badge-low">Avocado</span>
+          <span class="badge badge-low">Garlic</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<div class="pg-toast" id="pg-toast"></div>
+
+<script src="/static/pulseguard.js"></script>
+<script>
+let nutritionChart;
+
+function previewImage(input){
+  const file=input.files[0];
+  if(file){
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=document.getElementById('food-preview');
+      img.src=e.target.result; img.style.display='block';
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function handleDrop(event){
+  event.preventDefault();
+  const file=event.dataTransfer.files[0];
+  if(file&&file.type.startsWith('image/')){
+    document.getElementById('food-image').files=event.dataTransfer.files;
+    previewImage({files:[file]});
+  }
+}
+
+function quickAnalyze(name){
+  document.getElementById('food-name').value=name;
+  analyzeFood();
+}
+
+function getEmoji(category){
+  if(category.includes('Healthy')||category.includes('Balanced'))return'🥗';
+  if(category.includes('Junk'))return'🍕';
+  if(category.includes('High Fat'))return'🧀';
+  return'🍽️';
+}
+
+async function analyzeFood(){
+  const foodName=document.getElementById('food-name').value.trim();
+  if(!foodName){showToast('Please enter a food name','error');return;}
+
+  const btn=document.getElementById('analyze-btn');
+  btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Analyzing…';
+
+  try{
+    const res=await fetch('/api/diet-analyze',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({food_name:foodName})
+    });
+    const d=await res.json();
+    if(d.error){showToast('Analysis error','error');return;}
+
+    // Show result
+    document.getElementById('result-card').style.display='block';
+    document.getElementById('result-placeholder').style.display='none';
+
+    const box=document.getElementById('food-result-box');
+    box.style.borderColor=d.color;
+
+    document.getElementById('food-emoji').textContent=getEmoji(d.category);
+    document.getElementById('food-category').textContent=d.category;
+    document.getElementById('food-category').style.color=d.color;
+    document.getElementById('food-calories').textContent='≈ '+d.calories_estimate;
+    document.getElementById('food-feedback').textContent=d.feedback;
+    document.getElementById('food-tip').textContent='💡 '+d.heart_tip;
+
+    // Heart impact bar
+    const impacts={Positive:85,Moderate:50,Neutral:45,Negative:20};
+    const impactColors={Positive:'#1db954',Moderate:'#f39c12',Neutral:'#3498db',Negative:'#e74c3c'};
+    const pct=impacts[d.heart_impact]||45;
+    document.getElementById('heart-impact-bar').style.width=pct+'%';
+    document.getElementById('heart-impact-bar').style.background=impactColors[d.heart_impact]||'#888';
+    document.getElementById('heart-impact-label').textContent=d.heart_impact;
+    document.getElementById('heart-impact-label').style.color=impactColors[d.heart_impact];
+
+    // Nutrition chart
+    if(nutritionChart) nutritionChart.destroy();
+    const cal=parseInt(d.calories_estimate);
+    const isJunk=d.category.includes('Junk');
+    const isHealthy=d.category.includes('Healthy')||d.category.includes('Balanced');
+    nutritionChart=new Chart(document.getElementById('nutritionChart'),{
+      type:'bar',
+      data:{
+        labels:['Carbs','Protein','Fat','Fiber','Sugar','Sodium'],
+        datasets:[{
+          data:[
+            isJunk?55:isHealthy?40:45,
+            isHealthy?25:isJunk?12:18,
+            isJunk?35:isHealthy?15:22,
+            isHealthy?20:isJunk?5:10,
+            isJunk?40:isHealthy?10:20,
+            isJunk?70:isHealthy?20:40
+          ],
+          backgroundColor:[d.color+'33'],
+          borderColor:[d.color],
+          borderWidth:2, borderRadius:4
+        }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:false}},
+        scales:{
+          x:{grid:{color:'#222'},ticks:{color:'#888',font:{size:11}}},
+          y:{grid:{color:'#222'},ticks:{color:'#888'},max:100,title:{display:true,text:'Relative %',color:'#888'}}
+        }
+      }
+    });
+
+    showToast('Food analyzed successfully!','success');
+  }catch(e){showToast('Network error','error');}
+  finally{
+    btn.disabled=false;
+    btn.innerHTML='<i class="fas fa-microscope"></i> Analyze Food';
+  }
+}
+</script>
+</body>
+</html>

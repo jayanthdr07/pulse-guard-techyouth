@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>PulseGuard AI — Heart Rate Monitor</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+<link rel="stylesheet" href="/static/pulseguard.css"/>
+<style>
+#video{display:none}
+#capture-canvas{display:none}
+#wave-canvas{width:100%;height:160px;border-radius:10px;background:#050510;display:block}
+.bpm-ring{width:180px;height:180px;border-radius:50%;border:6px solid var(--primary);display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0 auto;box-shadow:0 0 30px rgba(29,185,84,0.3);position:relative;transition:box-shadow .4s}
+.bpm-ring.pulse-anim{animation:bpm-pulse 0.5s ease-out}
+@keyframes bpm-pulse{0%{box-shadow:0 0 30px rgba(29,185,84,0.3)}50%{box-shadow:0 0 60px rgba(29,185,84,0.7)}100%{box-shadow:0 0 30px rgba(29,185,84,0.3)}}
+.bpm-num{font-size:52px;font-weight:800;color:var(--primary);line-height:1}
+.bpm-label{font-size:12px;color:var(--muted);letter-spacing:2px;margin-top:4px}
+.metric-box{background:var(--card-bg);border:1px solid var(--card-border);border-radius:12px;padding:14px 18px;text-align:center}
+.metric-val{font-size:24px;font-weight:700;color:var(--primary)}
+.metric-lbl{font-size:11px;color:var(--muted);margin-top:2px}
+.sqi-bar{height:8px;border-radius:4px;background:#1a1a2e;overflow:hidden;margin-top:8px}
+.sqi-fill{height:100%;border-radius:4px;background:var(--primary);transition:width .5s ease}
+.status-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;background:rgba(29,185,84,0.15);color:var(--primary);border:1px solid rgba(29,185,84,0.3)}
+.status-badge.warning{background:rgba(243,156,18,0.15);color:#f39c12;border-color:rgba(243,156,18,0.3)}
+.status-badge.error{background:rgba(231,76,60,0.15);color:#e74c3c;border-color:rgba(231,76,60,0.3)}
+.overlay-msg{background:rgba(5,5,16,0.85);border-radius:10px;padding:16px;text-align:center;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80%;pointer-events:none;z-index:5}
+.wave-wrap{position:relative}
+.conf-bar{height:10px;border-radius:5px;background:#1a1a2e;overflow:hidden;margin-top:6px}
+.conf-fill{height:100%;border-radius:5px;background:linear-gradient(90deg,#f39c12,#1db954);transition:width .5s ease}
+.hrv-tag{padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
+.hrv-relaxed{background:rgba(29,185,84,0.2);color:#1db954}
+.hrv-moderate{background:rgba(243,156,18,0.2);color:#f39c12}
+.hrv-stress{background:rgba(231,76,60,0.2);color:#e74c3c}
+</style>
+</head>
+<body>
+
+<aside class="pg-sidebar" id="sidebar">
+  <div class="sidebar-logo"><i class="fas fa-heartbeat logo-icon"></i><span class="logo-text">PulseGuard AI</span></div>
+  <nav class="sidebar-nav">
+    <a href="/"           class="nav-item"><i class="fas fa-home"></i><span>Home</span></a>
+    <a href="/dashboard"  class="nav-item"><i class="fas fa-chart-line"></i><span>Dashboard</span></a>
+    <a href="/heartrate"  class="nav-item active"><i class="fas fa-heartbeat"></i><span>Heart Rate</span></a>`n    <a href="/chat" class="nav-item"><i class="fas fa-robot"></i><span>AI Assistant</span></a>
+    <a href="/lifestyle"  class="nav-item"><i class="fas fa-running"></i><span>Lifestyle</span></a>
+    <a href="/diet"       class="nav-item"><i class="fas fa-apple-alt"></i><span>Diet Analysis</span></a>
+    <a href="/emergency"  class="nav-item"><i class="fas fa-ambulance"></i><span>Emergency</span></a>
+    <a href="/#prediction" class="nav-item"><i class="fas fa-stethoscope"></i><span>Risk Prediction</span></a>
+  </nav>
+  <a href="/emergency" class="sidebar-sos"><i class="fas fa-exclamation-triangle"></i><span>SOS Emergency</span></a>
+</aside>
+
+<main class="pg-main">
+  <header class="pg-header">
+    <div>
+      <h1>💓 Heart Rate Monitor</h1>
+      <div class="header-sub">Face-based rPPG — automatic heart rate estimation from your face</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span class="status-badge" id="sys-status"><i class="fas fa-circle" style="font-size:8px"></i> Ready</span>
+      <a href="/dashboard" style="color:var(--muted);text-decoration:none;font-size:13px"><i class="fas fa-arrow-left"></i> Dashboard</a>
+    </div>
+  </header>
+
+  <div class="pg-content">
+
+    <!-- TOP ROW -->
+    <div class="grid-4 fade-in" style="margin-bottom:24px">
+      <div class="card" style="text-align:center">
+        <div class="card-title">Heart Rate</div>
+        <div class="bpm-ring" id="bpm-ring">
+          <div class="bpm-num" id="bpm-val">--</div>
+          <div class="bpm-label">BPM</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;grid-column:span 3">
+        <div class="grid-3" style="gap:12px">
+          <div class="metric-box">
+            <div class="metric-val" id="bp-val">--/--</div>
+            <div class="metric-lbl">ESTIMATED BP</div>
+            <div id="bp-tag" class="hrv-tag hrv-moderate" style="margin-top:6px;display:inline-block">Not medical diag.</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-val" id="risk-val">--</div>
+            <div class="metric-lbl">Risk Score</div>
+            <div class="sqi-bar"><div class="sqi-fill" id="risk-fill" style="width:0%"></div></div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-val" id="conf-val">0%</div>
+            <div class="metric-lbl">Confidence</div>
+            <div class="conf-bar"><div class="conf-fill" id="conf-fill" style="width:0%"></div></div>
+          </div>
+        </div>
+        <!-- Instructions + controls -->
+        <div class="card" style="padding:16px 20px">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+            <div>
+              <div style="font-weight:700;margin-bottom:4px" id="instr-title">📷 Face the front camera</div>
+              <div style="font-size:12px;color:var(--muted)" id="instr-sub">Ensure good lighting · Keep face in frame · Stay still for 20s</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn-primary" id="start-btn" onclick="startCamera()"><i class="fas fa-play"></i> Start</button>
+              <button class="btn-secondary" id="stop-btn" onclick="stopCamera()" style="display:none"><i class="fas fa-stop"></i> Stop</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WAVEFORM -->
+    <div class="card fade-in" style="margin-bottom:24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-weight:700"><i class="fas fa-video" style="color:var(--primary);margin-right:6px"></i>Live Camera Feed</div>
+        <div style="display:flex;gap:10px;font-size:12px;color:var(--muted)">
+          <span id="face-tag"><i class="fas fa-user"></i> AI Face Tracking</span>
+        </div>
+      </div>
+      <div class="wave-wrap">
+        <canvas id="wave-canvas" height="160"></canvas>
+        <div class="overlay-msg" id="overlay-msg">
+          <i class="fas fa-camera" style="font-size:28px;color:var(--primary);margin-bottom:8px;display:block"></i>
+          <div style="font-size:14px;font-weight:600">Click <b>Start</b> to activate camera</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">Camera permission required</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FINGER PPG ROW -->
+    <div class="card fade-in" style="margin-bottom:24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-weight:700"><i class="fas fa-hand-point-up" style="color:var(--primary);margin-right:6px"></i>Finger PPG Monitor</div>
+      </div>
+      <div class="grid-2" style="gap:16px;">
+        <div>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:10px">Place your index finger completely covering the rear camera lens (and flashlight if available) on your phone, or your webcam. Stay still and wait for the signal to stabilize.</p>
+          <div style="display:flex;gap:8px;margin-bottom:14px">
+            <button class="btn-primary" id="start-finger-btn" onclick="startFingerPPG()"><i class="fas fa-play"></i> Start Finger PPG</button>
+            <button class="btn-secondary" id="stop-finger-btn" onclick="stopFingerPPG()" style="display:none"><i class="fas fa-stop"></i> Stop</button>
+          </div>
+          <div class="metric-box" style="width:140px">
+            <div class="metric-val" id="finger-bpm-val">--</div>
+            <div class="metric-lbl">FINGER BPM</div>
+          </div>
+        </div>
+        <div>
+          <div style="position:relative;width:100%;height:140px;background:#050510;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.05)">
+            <canvas id="finger-wave-canvas" style="width:100%;height:100%;display:block"></canvas>
+            <div id="finger-status-overlay" style="position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(5,5,16,0.8);font-size:13px;font-weight:600">
+               Click Start to begin
+            </div>
+          </div>
+        </div>
+      </div>
+      <video id="finger-video" style="display:none" playsinline></video>
+      <canvas id="finger-process-canvas" style="display:none"></canvas>
+    </div>
+
+    <!-- INTEGRATION ROW -->
+    <div class="grid-2 fade-in">
+      <div class="card">
+        <div class="section-title"><i class="fas fa-shield-heart"></i> Risk Score Integration</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Send current heart rate to the risk scoring engine for a complete cardiovascular assessment.</p>
+        <div id="risk-result" style="display:none;margin-bottom:12px"></div>
+        <button class="btn-primary" id="risk-btn" onclick="sendToRisk()" disabled><i class="fas fa-chart-bar"></i> Update Risk Score</button>
+      </div>
+      <div class="card">
+        <div class="section-title"><i class="fas fa-ambulance"></i> Emergency Detection</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Abnormal heart rate will auto-flag for emergency. Manual check also available.</p>
+        <div id="emg-result" style="display:none;margin-bottom:12px"></div>
+        <button class="btn-primary" id="emg-btn" onclick="checkEmergency()" disabled style="background:linear-gradient(135deg,#c0392b,#e74c3c)"><i class="fas fa-exclamation-triangle"></i> Emergency Check</button>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<div class="pg-toast" id="pg-toast"></div>
+<video id="video" autoplay playsinline></video>
+<canvas id="capture-canvas"></canvas>
+
+<script src="/static/ppg_engine.js"></script>
+<script>
+// ── globals ─────────────────────────────────────────────────────────────────
+let stream     = null;
+let running    = false;
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordingTimer = null;
+let lastResult = null;
+
+// ── DOM refs ─────────────────────────────────────────────────────────────────
+const video   = document.getElementById('video');
+const wavCvs  = document.getElementById('wave-canvas');
+
+// ── camera start ─────────────────────────────────────────────────────────────
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: {ideal: 640}, height: {ideal: 480}, frameRate: {ideal: 30} }
+    });
+    video.srcObject = stream;
+    await video.play();
+
+    running = true;
+    document.getElementById('start-btn').style.display = 'none';
+    document.getElementById('stop-btn').style.display  = '';
+    document.getElementById('overlay-msg').style.display = 'none';
+    
+    // Switch preview to show the face
+    video.style.display = 'block';
+    video.style.width = '100%';
+    video.style.borderRadius = '10px';
+    document.getElementById('wave-canvas').style.display = 'none';
+    
+    setInstruction('🎥 Recording face...', 'Please stay still for 20 seconds', 'warning');
+    updateStatus('Recording...', 'warning');
+    
+    // Start recording
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+    
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) recordedChunks.push(e.data);
+    };
+    
+    mediaRecorder.onstop = async () => {
+        setInstruction('⏳ Analyzing...', 'Processing video with VitalLens AI', 'warning');
+        updateStatus('Analyzing...', 'warning');
+        
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const formData = new FormData();
+        formData.append('video', blob, 'face_video.webm');
+        
+        try {
+            const res = await fetch('/api/hr/from_face', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            
+            if (data.error) {
+                showToast(data.error, 'error');
+                updateStatus('Analysis Failed', 'error');
+            } else {
+                showToast('Analysis complete', 'success');
+                lastResult = data;
+                updateMetricsFromAPI(data);
+            }
+        } catch(err) {
+            showToast('API request failed', 'error');
+            updateStatus('Error', 'error');
+        }
+        
+        stopCameraUI();
+    };
+    
+    mediaRecorder.start();
+    
+    // Stop recording after 20 seconds
+    let timeLeft = 20;
+    document.getElementById('bpm-val').textContent = timeLeft;
+    document.getElementById('instr-title').innerHTML = `⏱️ Recording... ${timeLeft}s left`;
+    
+    recordingTimer = setInterval(() => {
+        timeLeft--;
+        if (timeLeft <= 0) {
+            clearInterval(recordingTimer);
+            if (mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            }
+        } else {
+            document.getElementById('bpm-val').textContent = timeLeft;
+            document.getElementById('instr-title').innerHTML = `⏱️ Recording... ${timeLeft}s left`;
+        }
+    }, 1000);
+    
+  } catch(e) {
+    showToast('Camera access denied — please allow camera permission', 'error');
+  }
+}
+
+// ── camera stop ──────────────────────────────────────────────────────────────
+function stopCamera() {
+  if (recordingTimer) clearInterval(recordingTimer);
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+  } else {
+      stopCameraUI();
+  }
+}
+
+function stopCameraUI() {
+  running = false;
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  
+  document.getElementById('start-btn').style.display = '';
+  document.getElementById('stop-btn').style.display  = 'none';
+  document.getElementById('overlay-msg').style.display = '';
+  document.getElementById('overlay-msg').innerHTML = `
+    <i class="fas fa-check-circle" style="font-size:28px;color:var(--primary);margin-bottom:8px;display:block"></i>
+    <div style="font-size:14px;font-weight:600">Measurement finished</div>`;
+    
+  video.style.display = 'none';
+  document.getElementById('wave-canvas').style.display = 'block';
+  updateStatus('Ready', '');
+  setInstruction('📷 Face the front camera', 'Ensure good lighting · Keep face in frame · Stay still for 20s');
+}
+
+// ── update UI ─────────────────────────────────────────────────────────────────
+function updateMetricsFromAPI(data) {
+  document.getElementById('bpm-val').textContent = data.bpm || '--';
+  document.getElementById('bp-val').textContent = data.estimated_bp || '--/--';
+  document.getElementById('risk-val').textContent = data.risk_score || '0';
+  document.getElementById('conf-val').textContent = Math.round(data.confidence * 100) + '%';
+  document.getElementById('risk-fill').style.width  = data.risk_score + '%';
+  document.getElementById('conf-fill').style.width = Math.round(data.confidence * 100) + '%';
+
+  // BPM pulse animation
+  const ring = document.getElementById('bpm-ring');
+  ring.classList.remove('pulse-anim');
+  void ring.offsetWidth;
+  ring.classList.add('pulse-anim');
+
+  // Enable integration buttons
+  if (data.confidence >= 0.5) {
+    document.getElementById('risk-btn').disabled = false;
+    document.getElementById('emg-btn').disabled  = false;
+  }
+  
+  if (data.status === 'critical') {
+      updateStatus('⚠️ Critical Alert', 'error');
+      showToast('Critical status detected. Emergency alert triggered.', 'error');
+  } else if (data.status === 'warning') {
+      updateStatus('Warning', 'warning');
+  } else {
+      updateStatus('Normal', 'success');
+  }
+  
+  // Optional: If waveform data is present from API, draw it
+  if (data.waveform && data.waveform.length > 0) {
+      drawWaveform(data.waveform);
+  }
+}
+
+function drawWaveform(buf) {
+  const wavCvs = document.getElementById('wave-canvas');
+  if (!wavCvs) return;
+  const wavCtx = wavCvs.getContext('2d');
+  const W = wavCvs.clientWidth, H = 160;
+  wavCvs.width = W; wavCvs.height = H;
+
+  // Background
+  wavCtx.fillStyle = '#050510';
+  wavCtx.fillRect(0,0,W,H);
+
+  // Grid
+  wavCtx.strokeStyle = 'rgba(255,255,255,0.04)';
+  wavCtx.lineWidth = 1;
+  for (let x=0;x<W;x+=W/10) { wavCtx.beginPath();wavCtx.moveTo(x,0);wavCtx.lineTo(x,H);wavCtx.stroke(); }
+  for (let y=0;y<H;y+=H/4)  { wavCtx.beginPath();wavCtx.moveTo(0,y);wavCtx.lineTo(W,y);wavCtx.stroke(); }
+
+  if (!buf || buf.length === 0 || buf.every(v=>v===0)) return;
+
+  const valid = buf.filter(v=>v!==0);
+  const mn = Math.min(...valid), mx = Math.max(...valid);
+  const range = mx - mn || 1;
+
+  // Glow + line
+  wavCtx.shadowBlur = 12;
+  wavCtx.shadowColor = '#1db954';
+  wavCtx.strokeStyle = '#1db954';
+  wavCtx.lineWidth = 2;
+  wavCtx.beginPath();
+  buf.forEach((v,i) => {
+    const x = (i / buf.length) * W;
+    const y = H - ((v - mn) / range) * (H * 0.7) - H * 0.15;
+    i===0 ? wavCtx.moveTo(x,y) : wavCtx.lineTo(x,y);
+  });
+  wavCtx.stroke();
+  wavCtx.shadowBlur = 0;
+
+  // Current value dot
+  const last = buf[buf.length-1];
+  const lx = W - 2;
+  const ly = H - ((last - mn) / range) * (H * 0.7) - H * 0.15;
+  wavCtx.fillStyle = '#1db954';
+  wavCtx.beginPath(); wavCtx.arc(lx, ly, 4, 0, 2*Math.PI); wavCtx.fill();
+}
+
+function setInstruction(title, sub, type) {
+  document.getElementById('instr-title').textContent = title;
+  document.getElementById('instr-sub').textContent = sub;
+}
+
+function updateStatus(msg, type) {
+  const el = document.getElementById('sys-status');
+  el.className = 'status-badge' + (type?' '+type:'');
+  el.innerHTML = `<i class="fas fa-circle" style="font-size:8px"></i> ${msg}`;
+}
+
+// ── Risk score integration ────────────────────────────────────────────────────
+async function sendToRisk() {
+  if (!lastResult) return;
+  const r = lastResult;
+  const payload = {
+    age:45, gender:1, bmi:25, smoking:0, alcohol:0,
+    cholesterol: r.bpm>100?1:0,
+    hypertension: r.bpm>120?1:0,
+    diabetes:0, family_history:0,
+    physical_activity:1, sleep:1,
+    hr_bpm: r.bpm, hrv: r.hrv
+  };
+  try {
+    const res  = await fetch('/api/heartrate/analyze', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ bpm:r.bpm, hrv:r.hrv, sqi:r.sqi,
+        confidence:r.confidence, signal_quality:r.signal_quality,
+        stress:r.stress, irregular:r.irregular, status:r.status })
+    });
+    const d = await res.json();
+    const el = document.getElementById('risk-result');
+    el.style.display = 'block';
+    el.innerHTML = `<div style="padding:10px;border-radius:8px;background:rgba(29,185,84,0.1);border:1px solid rgba(29,185,84,0.3);font-size:13px">
+      <b>Risk Level:</b> ${d.risk_level} &nbsp;|&nbsp; <b>Score:</b> ${d.risk_score}/100
+      ${d.alert ? '<br><span style="color:#e74c3c">⚠️ '+d.alert+'</span>' : ''}
+    </div>`;
+    showToast('Risk score updated with heart rate data ✅', 'success');
+  } catch(e) { showToast('Failed to connect to risk engine', 'error'); }
+}
+
+// ── Emergency check ───────────────────────────────────────────────────────────
+function checkEmergency() {
+  if (!lastResult) return;
+  const r = lastResult;
+  const el = document.getElementById('emg-result');
+  el.style.display = 'block';
+  if (r.bpm > 150 || r.bpm < 40 || r.irregular) {
+    el.innerHTML = `<div style="padding:10px;border-radius:8px;background:rgba(231,76,60,0.15);border:1px solid rgba(231,76,60,0.4);font-size:13px;color:#e74c3c">
+      <b>⚠️ ALERT:</b> HR ${r.bpm} BPM ${r.irregular?'+ irregular pattern':''}<br>
+      <a href="/emergency" style="color:#e74c3c;font-weight:700">→ Go to Emergency Page</a>
+    </div>`;
+    showToast('Abnormal HR — consider SOS!', 'error');
+  } else {
+    el.innerHTML = `<div style="padding:10px;border-radius:8px;background:rgba(29,185,84,0.1);border:1px solid rgba(29,185,84,0.3);font-size:13px">
+      ✅ Heart rate <b>${r.bpm} BPM</b> is within normal range.
+    </div>`;
+    showToast('HR is normal ✅', 'success');
+  }
+}
+
+// Keep waveform animating even when idle
+requestAnimationFrame(function tick(){
+  if (!running && typeof drawWaveform === 'function' && typeof waveBuffer !== 'undefined') drawWaveform(waveBuffer);
+  requestAnimationFrame(tick);
+});
+
+// ── Finger PPG Logic ────────────────────────────────────────────────────────
+let fingerStream = null;
+let fingerVideo = document.getElementById('finger-video');
+let fingerCanvas = document.getElementById('finger-process-canvas');
+let fingerCtx = fingerCanvas ? fingerCanvas.getContext('2d') : null;
+let fingerWaveCvs = document.getElementById('finger-wave-canvas');
+let fingerWaveCtx = fingerWaveCvs ? fingerWaveCvs.getContext('2d') : null;
+let fingerRunning = false;
+let fingerRedData = [];
+let fingerTimestamps = [];
+let fingerBpmList = [];
+
+async function startFingerPPG() {
+  if (!fingerCtx || !fingerWaveCtx) return;
+  try {
+    fingerStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: {ideal: 320}, height: {ideal: 240}, frameRate: {ideal: 30} }
+    });
+    const track = fingerStream.getVideoTracks()[0];
+    if (track.getCapabilities && track.getCapabilities().torch) {
+      track.applyConstraints({ advanced: [{ torch: true }] }).catch(e => console.log('Torch not supported', e));
+    }
+    
+    fingerVideo.srcObject = fingerStream;
+    await fingerVideo.play();
+    
+    fingerCanvas.width = 320;
+    fingerCanvas.height = 240;
+    
+    fingerRunning = true;
+    document.getElementById('start-finger-btn').style.display = 'none';
+    document.getElementById('stop-finger-btn').style.display = '';
+    document.getElementById('finger-status-overlay').style.display = 'none';
+    
+    fingerRedData = [];
+    fingerTimestamps = [];
+    fingerBpmList = [];
+    document.getElementById('finger-bpm-val').textContent = '--';
+    
+    requestAnimationFrame(processFingerFrame);
+    
+  } catch(e) {
+    showToast('Camera access denied for Finger PPG', 'error');
+  }
+}
+
+function stopFingerPPG() {
+  fingerRunning = false;
+  if (fingerStream) {
+    const track = fingerStream.getVideoTracks()[0];
+    if (track.getCapabilities && track.getCapabilities().torch) {
+      track.applyConstraints({ advanced: [{ torch: false }] }).catch(()=>{});
+    }
+    fingerStream.getTracks().forEach(t => t.stop());
+  }
+  document.getElementById('start-finger-btn').style.display = '';
+  document.getElementById('stop-finger-btn').style.display = 'none';
+  document.getElementById('finger-status-overlay').style.display = 'flex';
+  document.getElementById('finger-status-overlay').innerHTML = 'Stopped';
+}
+
+function processFingerFrame(now) {
+  if (!fingerRunning) return;
+  
+  fingerCtx.drawImage(fingerVideo, 0, 0, fingerCanvas.width, fingerCanvas.height);
+  let frame = fingerCtx.getImageData(0, 0, fingerCanvas.width, fingerCanvas.height);
+  let data = frame.data;
+  
+  let rSum = 0;
+  let count = 0;
+  let startX = fingerCanvas.width/2 - 25;
+  let endX = fingerCanvas.width/2 + 25;
+  let startY = fingerCanvas.height/2 - 25;
+  let endY = fingerCanvas.height/2 + 25;
+  
+  for(let y=startY; y<endY; y++){
+    for(let x=startX; x<endX; x++){
+      let i = (y * fingerCanvas.width + x) * 4;
+      rSum += data[i]; // Red channel
+      count++;
+    }
+  }
+  let rAvg = rSum / count;
+  
+  fingerRedData.push(rAvg);
+  fingerTimestamps.push(now);
+  
+  if (fingerRedData.length > 150) {
+    fingerRedData.shift();
+    fingerTimestamps.shift();
+  }
+  
+  detectFingerBPM();
+  drawFingerWaveform();
+  
+  requestAnimationFrame(processFingerFrame);
+}
+
+function detectFingerBPM() {
+  if (fingerRedData.length < 60) return;
+  
+  let smoothed = [];
+  let window = 5;
+  for(let i=0; i<fingerRedData.length; i++) {
+    let sum = 0, c = 0;
+    for(let j=Math.max(0, i-window); j<=Math.min(fingerRedData.length-1, i+window); j++){
+      sum += fingerRedData[j]; c++;
+    }
+    smoothed.push(sum/c);
+  }
+  
+  let peaks = [];
+  for(let i=2; i<smoothed.length-2; i++) {
+    if (smoothed[i] > smoothed[i-1] && smoothed[i] > smoothed[i-2] &&
+        smoothed[i] > smoothed[i+1] && smoothed[i] > smoothed[i+2]) {
+      
+      let localAvg = 0;
+      for(let j=Math.max(0, i-10); j<=Math.min(smoothed.length-1, i+10); j++){
+         localAvg += smoothed[j];
+      }
+      localAvg /= (Math.min(smoothed.length-1, i+10) - Math.max(0, i-10) + 1);
+      
+      if (smoothed[i] > localAvg * 1.01) { 
+         peaks.push(fingerTimestamps[i]);
+         i += 10; 
+      }
+    }
+  }
+  
+  if (peaks.length >= 2) {
+    let intervals = [];
+    for(let i=1; i<peaks.length; i++){
+      intervals.push(peaks[i] - peaks[i-1]);
+    }
+    let avgInterval = intervals.reduce((a,b)=>a+b, 0) / intervals.length;
+    let bpm = 60000 / avgInterval;
+    
+    if (bpm > 40 && bpm < 200) {
+       fingerBpmList.push(bpm);
+       if (fingerBpmList.length > 5) fingerBpmList.shift();
+       let avgBpm = fingerBpmList.reduce((a,b)=>a+b,0) / fingerBpmList.length;
+       document.getElementById('finger-bpm-val').textContent = Math.round(avgBpm);
+       
+       if (!lastResult) lastResult = {};
+       lastResult.bpm = Math.round(avgBpm);
+       lastResult.confidence = 0.8;
+       document.getElementById('risk-btn').disabled = false;
+       document.getElementById('emg-btn').disabled  = false;
+    }
+  }
+}
+
+function drawFingerWaveform() {
+  let W = fingerWaveCvs.clientWidth;
+  let H = fingerWaveCvs.clientHeight;
+  if(fingerWaveCvs.width !== W) fingerWaveCvs.width = W;
+  if(fingerWaveCvs.height !== H) fingerWaveCvs.height = H;
+  
+  fingerWaveCtx.clearRect(0,0,W,H);
+  if(fingerRedData.length < 2) return;
+  
+  let displayData = fingerRedData.map(v => -v);
+  let min = Math.min(...displayData);
+  let max = Math.max(...displayData);
+  let range = max - min || 1;
+  
+  fingerWaveCtx.strokeStyle = '#e74c3c';
+  fingerWaveCtx.lineWidth = 2;
+  fingerWaveCtx.beginPath();
+  
+  for(let i=0; i<displayData.length; i++) {
+    let x = (i / 150) * W;
+    let y = H - ((displayData[i] - min) / range) * (H * 0.8) - H*0.1;
+    if(i===0) fingerWaveCtx.moveTo(x,y);
+    else fingerWaveCtx.lineTo(x,y);
+  }
+  fingerWaveCtx.stroke();
+}
+
+</script>
+</body>
+</html>
