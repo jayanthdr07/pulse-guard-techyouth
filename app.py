@@ -164,7 +164,7 @@ app.config['MAIL_SERVER']       = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT']         = int(os.getenv('MAIL_PORT', 587))
 app.config['MAIL_USE_TLS']      = os.getenv('MAIL_USE_TLS', 'True') == 'True'
 app.config['MAIL_USERNAME']     = os.getenv('MAIL_USERNAME')
-app.config['MAIL_PASSWORD']     = os.getenv('MAIL_PASSWORD')
+app.config['MAIL_PASSWORD']     = (os.getenv('MAIL_PASSWORD') or '').replace(' ', '')
 app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_USERNAME')
 mail = Mail(app)
 
@@ -368,14 +368,29 @@ def last_prediction():
 # ── Doctor Appointment Email & Video Auto-Join ─────────────────────────────
 DOCTOR_NOTIFICATION_EMAIL = "jayanthgowda1406@gmail.com"
 
+def get_lan_ip():
+    try:
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
 def send_doctor_appointment_email(appt, user):
     doctor_email = DOCTOR_NOTIFICATION_EMAIL
     if not app.config.get('MAIL_USERNAME'):
         print("Mail username not configured, cannot send appointment email")
         return False
     try:
-        accept_join_url = f"http://127.0.0.1:5000/doctor/accept_and_join/{appt.room_id}"
-        video_url = f"http://127.0.0.1:5000/videochat/{appt.room_id}?role=doctor"
+        lan_ip = get_lan_ip()
+        # Direct Jitsi URL: works on ANY smartphone, iPhone, Android, or laptop worldwide (no localhost needed!)
+        direct_video_url = f"https://meet.jit.si/{appt.room_id}#config.prejoinConfig.enabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.requireDisplayName=false&userInfo.displayName=Dr.%20Jayanth%20Gowda"
+        # Local Wi-Fi accept URL: works for devices on the same Wi-Fi network
+        lan_accept_url = f"http://{lan_ip}:5000/doctor/accept_and_join/{appt.room_id}"
+        localhost_accept_url = f"http://127.0.0.1:5000/doctor/accept_and_join/{appt.room_id}"
         
         msg = Message(
             subject=f"🚨 URGENT: Doctor Appointment Request - Patient {user.full_name} ({round(appt.trigger_bpm)} BPM)",
@@ -390,15 +405,16 @@ def send_doctor_appointment_email(appt, user):
             f"- Phone: {user.phone}\n"
             f"- Heart Rate: {round(appt.trigger_bpm)} BPM (Abnormal Reading)\n"
             f"- Time: {appt.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
-            f"- Reason: {appt.notes}\n\n"
-            f"👉 TO ACCEPT AND AUTOMATICALLY START LIVE VIDEO CALL WITH PATIENT, CLICK HERE:\n"
-            f"{accept_join_url}\n\n"
-            f"(Once you click, the appointment status changes to Accepted and both doctor and patient video feeds turn ON automatically).\n"
+            f"- Clinical Note: {appt.notes}\n\n"
+            f"👉 CLICK TO JOIN VIDEO CALL FROM ANY PHONE OR COMPUTER (CAMERA & MIC AUTO-ON):\n"
+            f"{direct_video_url}\n\n"
+            f"If you are on the same Wi-Fi as the host machine, you can also use:\n"
+            f"{lan_accept_url}\n"
         )
         msg.html = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0b0c10; color: #ffffff; padding: 25px; border-radius: 12px; border: 1px solid #1f2833;">
             <div style="text-align: center; margin-bottom: 20px;">
-                <h2 style="color: #e74c3c; margin: 0; font-size: 22px;">🚨 URGENT: Doctor Video Consultation Request</h2>
+                <h2 style="color: #e74c3c; margin: 0; font-size: 22px;">🚨 URGENT: Patient Video Consultation Request</h2>
                 <p style="color: #888888; font-size: 13px; margin-top: 5px;">PulseGuard AI &bull; Telecardiology Network</p>
             </div>
             
@@ -411,19 +427,24 @@ def send_doctor_appointment_email(appt, user):
                 <p style="margin: 6px 0; font-size: 13px; color: #aaaaaa;"><strong>Clinical Note:</strong> {appt.notes}</p>
             </div>
 
-            <div style="text-align: center; margin: 30px 0;">
-                <a href="{accept_join_url}" style="background: #2ecc71; color: #ffffff; padding: 16px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 15px rgba(46,204,113,0.4);">
-                    👉 ACCEPT APPOINTMENT & START VIDEO CALL
+            <!-- PRIMARY BUTTON: Universal Link that works on ANY mobile device, phone, or laptop -->
+            <div style="text-align: center; margin: 25px 0;">
+                <a href="{direct_video_url}" style="background: #2ecc71; color: #ffffff; padding: 18px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 20px rgba(46,204,113,0.5);">
+                    📹 JOIN LIVE VIDEO CALL NOW<br>
+                    <span style="font-size: 12px; font-weight: normal; opacity: 0.9;">(Works on ANY Mobile Phone, Tablet, or PC)</span>
                 </a>
             </div>
 
-            <div style="background: rgba(46,204,113,0.1); border: 1px solid rgba(46,204,113,0.3); padding: 12px; border-radius: 8px; font-size: 12px; color: #2ecc71; text-align: center;">
-                ⚡ <strong>Automatic Connection:</strong> Clicking the link above marks the appointment as Accepted and automatically launches the video call with camera and microphone ON.
+            <div style="background: rgba(46,204,113,0.1); border: 1px solid rgba(46,204,113,0.3); padding: 12px; border-radius: 8px; font-size: 12px; color: #2ecc71; text-align: center; margin-bottom: 20px;">
+                ⚡ <strong>Instant Video:</strong> Camera and microphone will activate automatically upon connecting. No app installation required!
             </div>
 
-            <p style="font-size: 11px; color: #666666; text-align: center; margin-top: 20px;">
-                Direct link: <a href="{accept_join_url}" style="color: #3498db;">{accept_join_url}</a>
-            </p>
+            <!-- ALTERNATIVE LINKS -->
+            <div style="border-top: 1px solid #222; padding-top: 15px; font-size: 12px; color: #888888; text-align: left;">
+                <p style="margin: 4px 0;"><strong>Alternative Access Links:</strong></p>
+                <p style="margin: 4px 0;">&bull; On Same Wi-Fi Network: <a href="{lan_accept_url}" style="color: #3498db;">{lan_accept_url}</a></p>
+                <p style="margin: 4px 0;">&bull; On Host Laptop: <a href="{localhost_accept_url}" style="color: #3498db;">{localhost_accept_url}</a></p>
+            </div>
         </div>
         """
         mail.send(msg)
@@ -465,12 +486,17 @@ def request_doctor_appointment():
     db.session.commit()
     
     email_sent = send_doctor_appointment_email(appt, current_user)
+    doctor_url = f"http://127.0.0.1:5000/doctor/accept_and_join/{room_id}"
+    mailto_url = f"mailto:{DOCTOR_NOTIFICATION_EMAIL}?subject=Urgent%20Cardiology%20Consultation%20Request%20-%20Patient%20{current_user.full_name}&body=Please%20accept%20and%20join%20the%20live%20video%20call%20here:%20{doctor_url}"
+
     return jsonify({
         "status": "success",
         "appointment_id": appt.id,
         "room_id": room_id,
+        "doctor_url": doctor_url,
+        "mailto_url": mailto_url,
         "email_sent": email_sent,
-        "message": f"Appointment request sent to {DOCTOR_NOTIFICATION_EMAIL}! Once accepted, video chat will open automatically." if email_sent else "Appointment created, but email could not be sent (check SMTP settings)."
+        "message": f"Appointment request dispatched to {DOCTOR_NOTIFICATION_EMAIL}!" if email_sent else "Appointment created! (Email could not be sent via SMTP due to invalid Gmail App Password)."
     })
 
 # ── Appointments & Video Chat ──────────────────────────────────────────────

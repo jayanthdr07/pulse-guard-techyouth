@@ -81,7 +81,7 @@
           .then(r => r.json())
           .then(data => {
               if (data.room_id) {
-                  window.location.href = `/videochat/${data.room_id}`;
+                  window.location.href = `/videochat/${data.room_id}?role=doctor`;
               } else {
                   location.reload();
               }
