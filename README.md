@@ -119,6 +119,11 @@ PulseGuard AI solves these systemic healthcare failures through a **democratized
 * **Tokenized Family Health Card (`/family/<token>`)**: Generates secure, read-only dashboard links that patients can share with family members or primary care physicians without exposing account credentials.
 * **One-Click Clinical Report Exporter**: Formats vital signs, arrhythmia records, and XGBoost predictions into a clean, printable medical report.
 
+### 9. ⌚ PulseGuard Wear: 3D Interactive Studio & 9-Layer Teardown (`/wearable`)
+* **Real-Time WebGL 3D Model**: Fully interactive Three.js rendered device simulating continuous PPG heart rate monitoring, motion classification (Resting vs. Brisk Walk vs. Workout vs. Resting Tachycardia), and one-press SOS triggering.
+* **Customizable Hardware Aesthetics**: Switch between 44mm Watch and Slim Band form factors, customize case metals (Graphite, Silver, Titanium Gold), and change fluoroelastomer straps (Obsidian, Pulse Red, Sage, Sand, Glacier).
+* **Scroll-Driven 9-Layer Engineering Teardown**: Scroll-activated exploded 3D view detailing all 9 physical layers (Sapphire Cover Glass, Capacitive Touch Grid, 1000-nit AMOLED, Aluminum Unibody Midframe, 8-layer HDI Logic Board, Li-ion Battery Cell, Optical PPG Sensor Module, Zirconia Ceramic Back, and Quick-Release Strap).
+
 ---
 
 ## 🔬 Mathematical, Algorithmic & Model Architecture
@@ -225,6 +230,7 @@ CardioSense.AI_Backend/
     ├── diet.html                  # Personalized DASH / Mediterranean meal planner
     ├── lifestyle.html             # Cardiovascular exercise & lifestyle habits coach
     ├── videochat.html             # Jitsi Meet encrypted WebRTC teleconsultation room
+    ├── wearable.html              # PulseGuard Wear 3D interactive model & 9-layer teardown
     ├── login.html                 # Patient / physician authentication portal
     ├── register.html              # Account registration with baseline demographics
     └── newsletter.html            # Preventive heart health educational dispatch

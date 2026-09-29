@@ -592,6 +592,10 @@ def doctor_dashboard():
 def home():
     return render_template("index.html")
 
+@app.route("/wearable")
+def wearable():
+    return render_template("wearable.html")
+
 @app.route("/dashboard")
 @login_required
 def dashboard():

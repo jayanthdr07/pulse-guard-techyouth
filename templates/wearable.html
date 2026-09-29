@@ -1,1017 +1,333 @@
 <!DOCTYPE html>
+<!--
+  PulseGuard AI - 3D Wearable (single file)
+  Contains: 1) live 3D watch/band model with simulated heart rate, alerts, SOS
+            2) scroll-driven layer-by-layer teardown of the same device
+  Flask:  templates/wearable.html
+  Route:  @app.route("/wearable")
+-->
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PulseGuard AI — PulseGuard | Predict. Prevent. Protect.</title>
-
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PulseGuard Wear — 3D Interactive Model & Teardown</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet" />
+<style>
+:root{
+  --bg:#0a0f12; --surface:#10171b; --surface-2:#161f24; --line:#223038; --fg:#e8eef0; --muted:#8b9ba2;
+  --pulse:#ff4d5e; --ok:#3ddc97; --warn:#ffb547; --sensor:#46f0a0;
+  --display:'Chakra Petch','Segoe UI',system-ui,sans-serif;
+  --body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--body);font-size:15px;line-height:1.5;padding-inline:clamp(16px,3vw,40px);padding-block:28px 48px}
+#live .app{max-width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+#live .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--pulse);margin:0 0 6px}
+#live h1{font-family:var(--display);font-weight:700;font-size:clamp(30px,4.4vw,52px);line-height:1;margin:0;letter-spacing:.01em;text-wrap:balance}
+#live .lede{color:var(--muted);max-width:64ch;margin:10px 0 0}
+#live .grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start}
+@media (max-width:920px){
+#live .grid{grid-template-columns:minmax(0,1fr)}
+}
+#live .col{display:flex;flex-direction:column;gap:14px;min-width:0}
+#live .stage{position:relative;height:clamp(380px,64vh,640px);border:1px solid var(--line);border-radius:16px;overflow:hidden;cursor:grab;touch-action:pan-y;
+  background:
+    repeating-linear-gradient(0deg,rgba(255,255,255,.025) 0 1px,transparent 1px 40px),
+    repeating-linear-gradient(90deg,rgba(255,255,255,.025) 0 1px,transparent 1px 40px),
+    radial-gradient(ellipse at 50% 36%,#1b282e 0%,#0e1518 58%,#0a0f12 100%);}
+#live .stage:active{cursor:grabbing}
+#live .stage canvas{display:block;width:100%;height:100%}
+#live .stage-meta{position:absolute;left:14px;right:14px;bottom:12px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;color:var(--muted);pointer-events:none}
+#live .stage-tag{position:absolute;top:12px;left:14px;font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);pointer-events:none}
+#live .readout{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:560px){
+#live .readout{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+#live .tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0}
+#live .tile .k{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+#live .tile .v{font-family:var(--display);font-weight:600;font-size:28px;line-height:1.15;font-variant-numeric:tabular-nums;margin-top:2px}
+#live .tile .v small{font-family:var(--mono);font-size:12px;color:var(--muted);font-weight:400;margin-left:4px}
+#live .pill{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:13px;font-weight:500;padding:4px 10px;border-radius:999px;margin-top:6px;border:1px solid currentColor}
+#live .pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+#live .panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:18px}
+#live .group{display:flex;flex-direction:column;gap:8px}
+#live .label{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+#live .seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:3px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px}
+#live .seg button{font:500 13px var(--body);color:var(--muted);background:transparent;border:0;border-radius:7px;padding:8px 4px;cursor:pointer}
+#live .seg button:hover{color:var(--fg)}
+#live .seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+#live .scen{display:flex;flex-direction:column;gap:6px}
+#live .scen button{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 10px;text-align:left;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:9px 12px;cursor:pointer;font:500 14px var(--body)}
+#live .scen button span{font-family:var(--mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+#live .scen button em{grid-column:1/-1;font-style:normal;font-size:12.5px;color:var(--muted);font-weight:400}
+#live .scen button:hover{border-color:#35464f}
+#live .scen button[aria-pressed="true"]{border-color:var(--fg);background:var(--surface-2)}
+#live .scen button.danger[aria-pressed="true"]{border-color:var(--pulse)}
+#live .swatches{display:flex;gap:8px;flex-wrap:wrap}
+#live .sw{width:30px;height:30px;border-radius:50%;border:2px solid var(--bg);outline:1px solid var(--line);cursor:pointer;padding:0}
+#live .sw[aria-pressed="true"]{outline:2px solid var(--fg);outline-offset:1px}
+#live .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#live .btn{font:600 13.5px var(--body);border-radius:10px;padding:10px 14px;cursor:pointer;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+#live .btn.sos{background:var(--pulse);border-color:var(--pulse);color:#1a0306;flex:1}
+#live .btn:disabled{opacity:.45;cursor:not-allowed}
+#live .toggle{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--muted);cursor:pointer}
+#live .toggle input{accent-color:var(--pulse);width:16px;height:16px}
+#live button:focus-visible,#live input:focus-visible{outline:2px solid var(--pulse);outline-offset:2px}
+#live .log{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0}
+#live .log ol{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:190px;overflow:auto}
+#live .log li{display:grid;grid-template-columns:62px 1fr;gap:10px;font-size:13.5px}
+#live .log time{font-family:var(--mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;padding-top:1px}
+#live .log li.alert{color:var(--pulse)}
+#live .log li.good{color:var(--ok)}
+#live .below{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px}
+@media (max-width:920px){
+#live .below{grid-template-columns:minmax(0,1fr)}
+}
+#live .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px;min-width:0}
+#live .card h2{font-family:var(--display);font-weight:600;font-size:20px;margin:0 0 12px;letter-spacing:.01em}
+#live .spec{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;margin:0}
+#live .spec dt{font-family:var(--mono);font-size:12.5px;color:var(--sensor);white-space:nowrap}
+#live .spec dd{margin:0;color:var(--muted);font-size:14px}
+#live .flow{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap}
+#live .node{flex:1 1 110px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
+#live .node b{display:block;font-family:var(--display);font-weight:600;font-size:15px}
+#live .node span{font-size:12.5px;color:var(--muted)}
+#live .arrow{align-self:center;color:var(--muted);font-family:var(--mono)}
+#live .note{font-size:12.5px;color:var(--muted);margin:12px 0 0}
+@media (prefers-reduced-motion:reduce){
+*{scroll-behavior:auto}
+}
+#td .wrap{max-width:1320px;margin:0 auto}
+#td .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--pulse);margin:0 0 6px}
+#td h1{font-family:var(--display);font-weight:700;font-size:clamp(30px,4.4vw,52px);line-height:1;margin:0;text-wrap:balance}
+#td .lede{color:var(--muted);max-width:62ch;margin:10px 0 0}
+#td .head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-bottom:18px}
+#td .seg{display:inline-grid;grid-auto-flow:column;gap:3px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:3px}
+#td .seg button{font:500 13.5px var(--body);color:var(--muted);background:transparent;border:0;border-radius:7px;padding:8px 18px;cursor:pointer}
+#td .seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+#td button:focus-visible{outline:2px solid var(--pulse);outline-offset:2px}
+#td .scrolly{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:28px;position:relative}
+#td .stage{position:sticky;top:0;height:100vh;height:100dvh;grid-column:2;grid-row:1;border:1px solid var(--line);border-radius:18px;overflow:hidden;cursor:grab;touch-action:pan-y;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0 1px,transparent 1px 44px),repeating-linear-gradient(90deg,rgba(255,255,255,.022) 0 1px,transparent 1px 44px),radial-gradient(ellipse at 50% 40%,#1b282e 0%,#0e1518 60%,#0a0f12 100%)}
+#td .stage:active{cursor:grabbing}
+#td .stage canvas{display:block;width:100%;height:100%}
+#td .overlay{position:absolute;inset:0;pointer-events:none}
+#td .overlay svg{position:absolute;inset:0;width:100%;height:100%}
+#td .lbl{position:absolute;left:0;top:0;white-space:nowrap;font-family:var(--mono);font-size:12px;color:var(--muted);transition:color .2s}
+#td .lbl b{font-family:var(--display);font-weight:600;font-size:14px;color:var(--fg);margin-right:6px}
+#td .lbl .sub{display:block;padding-left:26px;font-size:11.5px;line-height:1.3}
+#td .lbl{line-height:1.25}
+#td .lbl .n{color:var(--pulse);margin-right:6px}
+#td .lbl.on b{color:var(--pulse)}
+#td .hud{position:absolute;left:14px;right:14px;top:12px;display:flex;justify-content:space-between;gap:10px;font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);pointer-events:none}
+#td .bar{position:absolute;left:14px;right:14px;bottom:14px;height:3px;background:var(--line);border-radius:3px;overflow:hidden;pointer-events:none}
+#td .bar i{display:block;height:100%;width:0;background:var(--pulse)}
+#td .steps{grid-column:1;grid-row:1;display:flex;flex-direction:column}
+#td .step{min-height:88vh;display:flex;align-items:center}
+#td .step:first-child{min-height:70vh;align-items:flex-start;padding-top:14vh}
+#td .step:last-child{min-height:90vh}
+#td .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;opacity:.45;transition:opacity .3s,border-color .3s;width:100%}
+#td .step.active .card{opacity:1;border-color:#3a4c55}
+#td .card .k{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--pulse)}
+#td .card h2{font-family:var(--display);font-weight:600;font-size:24px;line-height:1.15;margin:6px 0 8px}
+#td .card p{margin:0;color:#c3ced2}
+#td .card dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:12px 0 0;font-size:13.5px}
+#td .card dt{font-family:var(--mono);font-size:12px;color:var(--muted);padding-top:1px}
+#td .card dd{margin:0}
+#td .link{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);font-size:13.5px;color:var(--muted)}
+#td .link strong{color:var(--sensor);font-weight:500}
+@media (max-width:860px){
+#td .scrolly{grid-template-columns:minmax(0,1fr);gap:0}
+#td .stage{grid-column:1;height:56vh;height:56dvh;z-index:2;border-radius:14px}
+#td .steps{grid-column:1;grid-row:2}
+#td .step,#td .step:first-child{min-height:70vh;align-items:flex-start;padding-top:0}
+#td .step:first-child{padding-top:4vh}
+#td .card{opacity:1}
+}
+#td .specs{margin-top:40px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px}
+#td .specs h2{font-family:var(--display);font-weight:600;font-size:22px;margin:0 0 4px}
+#td .specs p{color:var(--muted);margin:0 0 14px;font-size:14px}
+#td .tbl{overflow-x:auto}
+#td table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
+#td th,#td td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+#td th{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:500}
+#td td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+#td th.num{text-align:right}
+#td td.n{font-family:var(--mono);color:var(--pulse);width:40px}
+#td tfoot td{font-weight:600;border-bottom:0}
+/* page chrome */
+.pg-topbar{max-width:1320px;margin:0 auto 22px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:13px}
+.pg-topbar a{color:var(--muted);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:8px 14px;display:inline-flex;align-items:center;gap:6px;transition:all .2s}
+.pg-topbar a:hover{color:var(--fg);border-color:var(--fg);background:rgba(255,255,255,0.05)}
+#td{margin-top:64px;padding-top:40px;border-top:1px solid var(--line)}
+</style>
 </head>
-
 <body>
-    <!-- NAVBAR -->
-  <nav class="navbar" style="background: rgba(10, 10, 15, 0.95); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 10px 0;">
-    <div class="container navbar-content" style="max-width: 1440px; width: 95%; margin: 0 auto; display: flex; justify-content: space-between; align-items: center;">
-      <a href="#home" class="logo" style="text-decoration: none; display: flex; align-items: center; gap: 10px;">
-        <i class="fas fa-heartbeat" style="color: var(--primary, #1db954); font-size: 26px;"></i>
-        <span style="font-weight: 800; font-size: 22px; background: linear-gradient(90deg, #1db954 0%, #2ecc71 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">PulseGuard AI</span>
-      </a>
+<nav class="pg-topbar">
+  <div style="display:flex;gap:10px;align-items:center;">
+    <a href="/"><i class="fas fa-arrow-left"></i> Home</a>
+    <a href="/dashboard"><i class="fas fa-chart-line"></i> Dashboard</a>
+    <a href="/heartrate"><i class="fas fa-heartbeat"></i> Heart Rate (PPG)</a>
+  </div>
+  <div>
+    <a href="#td" style="color:var(--sensor);border-color:rgba(70,240,160,0.3);"><i class="fas fa-layer-group"></i> Jump to layer-by-layer teardown ↓</a>
+  </div>
+</nav>
 
-      <div class="nav-links" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-        <a href="#home" class="active" style="padding: 6px 10px; font-size: 13.5px; font-weight: 600;"><i class="fas fa-home"></i> Home</a>
-        <a href="/dashboard" style="color: #1db954; font-weight: 700; padding: 6px 10px; font-size: 13.5px;"><i class="fas fa-chart-line"></i> Dashboard</a>
-        <a href="/heartrate" style="padding: 6px 10px; font-size: 13.5px;"><i class="fas fa-heartbeat"></i> Heart Rate (PPG)</a>
-        <a href="#wearable-showcase" style="color: #46f0a0; font-weight: 700; padding: 6px 10px; font-size: 13.5px;"><i class="fas fa-cube"></i> Wearable 3D</a>
-        <a href="/appointments" style="color: #2ecc71; font-weight: 700; padding: 6px 10px; font-size: 13.5px;"><i class="fas fa-video"></i> Video Consult</a>
-        <a href="/doctor" style="color: #3498db; font-weight: 700; padding: 6px 10px; font-size: 13.5px;"><i class="fas fa-user-md"></i> Doctor Portal</a>
-        <a href="/reports" style="padding: 6px 10px; font-size: 13.5px;"><i class="fas fa-file-medical"></i> Reports</a>
-        <a href="/chat" style="padding: 6px 10px; font-size: 13.5px;"><i class="fas fa-robot"></i> AI Chat</a>
-        
-        <a href="/emergency" style="background: linear-gradient(135deg, #e74c3c, #c0392b); color: #fff !important; font-weight: 800; padding: 7px 14px; border-radius: 20px; font-size: 13px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 10px rgba(231,76,60,0.4); margin: 0 4px;">
-          <i class="fas fa-ambulance"></i> 🚨 SOS Emergency
-        </a>
+<!-- ============ 1. LIVE 3D MODEL ============ -->
+<section id="live">
+<div class="app">
+  <header>
+    <p class="eyebrow">PulseGuard AI · wearable concept</p>
+    <h1>PulseGuard Wear</h1>
+    <p class="lede">A 3D model of the band that would feed the PulseGuard app: continuous PPG heart rate, alerts that know the difference between a workout and a problem, and one-press SOS. Every reading on this page is simulated.</p>
+  </header>
 
-        {% if current_user.is_authenticated %}
-        <a href="/logout" style="color: #e74c3c; border: 1px solid rgba(231,76,60,0.4); padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none;">
-          <i class="fas fa-sign-out-alt"></i> Logout ({{ current_user.full_name.split()[0] }})
-        </a>
-        {% else %}
-        <a href="/login" style="color: var(--primary, #1db954); font-weight: 700; border: 1px solid var(--primary, #1db954); padding: 6px 12px; border-radius: 6px; font-size: 13px; text-decoration: none;">
-          <i class="fas fa-sign-in-alt"></i> Login
-        </a>
-        <a href="/register" style="color: #fff; background: var(--primary, #1db954); font-weight: 700; padding: 6px 14px; border-radius: 6px; font-size: 13px; text-decoration: none;">
-          <i class="fas fa-user-plus"></i> Register
-        </a>
-        {% endif %}
+  <main class="grid">
+    <div class="col">
+      <div id="stage" class="stage" role="img" aria-label="Interactive 3D model of the PulseGuard Wear device">
+        <div class="stage-tag" id="stageTag">Watch · Graphite</div>
+        <div class="stage-meta"><span id="dims">44 × 38 mm case · 10.7 mm thick</span><span>Drag to rotate · scroll to zoom · Sensors view fades the strap</span></div>
+      </div>
+      <div class="readout">
+        <div class="tile"><div class="k">Heart rate</div><div class="v"><span id="rBpm">72</span><small>BPM</small></div></div>
+        <div class="tile"><div class="k">Signal quality</div><div class="v"><span id="rSqi">94</span><small>%</small></div></div>
+        <div class="tile"><div class="k">Risk score</div><div class="v"><span id="rRisk">34</span><small>/ 100</small></div></div>
+        <div class="tile"><div class="k">Status</div><div id="rStatus" class="pill" style="color:var(--ok)">Normal</div></div>
+      </div>
+      <div class="log">
+        <div class="label"><span>Device events</span><span>simulated</span></div>
+        <ol id="log" aria-live="polite"></ol>
       </div>
     </div>
-  </nav>
 
-  <!-- HERO SECTION -->
-  <section class="hero" id="home">
-    <div class="hero-bg"></div>
-    <div class="container">
-      <div class="hero-content">
-        <div class="hero-text">
-          <h1>AI-Powered <span>Heart Disease</span> Prediction System</h1>
-          <p>PulseGuard AI uses advanced machine learning algorithms to predict your risk of heart disease based on key
-            health indicators. Get personalized insights, recommendations, and take control of your heart health today.
-          </p>
-          <div id="navbar" class="hero-buttons">
-            <button class="btn btn-primary" onclick="location.href='#prediction'">
-              <i class="fas fa-calculator"></i>
-              Start Prediction
-            </button>
-            <button class="btn btn-outline" onclick="location.href='#features'">
-              <i class="fas fa-info-circle"></i>
-              Learn More
-            </button>
-          </div>
-        </div>
-        <div class="hero-image">
-          <img src="static\images\istockphoto-1126458889-612x612-removebg-preview.png" alt="Heart Health Visualization">
-          <div class="pulse-circle"></div>
+    <aside class="panel" aria-label="Device controls">
+      <div class="group">
+        <div class="label">Form factor</div>
+        <div class="seg" id="segForm">
+          <button id="fWatch" data-v="watch" aria-pressed="true">Watch</button>
+          <button id="fBand" data-v="band" aria-pressed="false">Band</button>
         </div>
       </div>
+      <div class="group">
+        <div class="label">Screen</div>
+        <div class="seg" id="segScreen">
+          <button id="sHeart" data-v="heart" aria-pressed="true">Heart</button>
+          <button id="sRisk" data-v="risk" aria-pressed="false">Risk</button>
+          <button id="sTrend" data-v="trend" aria-pressed="false">7-day</button>
+          <button id="sSos" data-v="sos" aria-pressed="false">SOS</button>
+        </div>
+      </div>
+      <div class="group">
+        <div class="label"><span>Scenario</span><span>motion</span></div>
+        <div class="scen" id="scen">
+          <button id="cRest" data-v="rest" aria-pressed="true">Resting <span>72 BPM · still</span><em>Normal sinus rhythm at the desk.</em></button>
+          <button id="cWalk" data-v="walk" aria-pressed="false">Brisk walk <span>104 BPM · moving</span><em>Elevated, explained by steps.</em></button>
+          <button id="cRun" data-v="run" aria-pressed="false">Workout <span>146 BPM · moving</span><em>Logged as exercise. No alert.</em></button>
+          <button id="cTachy" data-v="tachy" class="danger" aria-pressed="false">Tachycardia at rest <span>197 BPM · still</span><em>Sustained high rate with no motion. Triggers the doctor flow.</em></button>
+        </div>
+      </div>
+      <div class="group">
+        <div class="label">Case</div>
+        <div class="swatches" id="swCase"></div>
+        <div class="label" style="margin-top:6px">Strap</div>
+        <div class="swatches" id="swStrap"></div>
+      </div>
+      <div class="group">
+        <div class="label">View</div>
+        <div class="seg" id="segView">
+          <button id="vFront" data-v="front" aria-pressed="false">Front</button>
+          <button id="vSide" data-v="side" aria-pressed="false">Side</button>
+          <button id="vBack" data-v="back" aria-pressed="false">Sensors</button>
+        </div>
+        <label class="toggle"><input type="checkbox" id="auto" checked> Auto-rotate</label>
+      </div>
+      <div class="group">
+        <div class="label">Emergency</div>
+        <div class="row">
+          <button class="btn sos" id="btnSos">Hold-to-SOS (simulate)</button>
+          <button class="btn" id="btnCancel" disabled>Cancel</button>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <section class="below">
+    <div class="card">
+      <h2>Sensor stack on the back</h2>
+      <dl class="spec">
+        <dt>4 × green LED</dt><dd>525 nm reflective PPG. The same signal your camera scan reads, but continuous and without a finger on the lens.</dd>
+        <dt>Red + IR LED</dt><dd>660 / 940 nm pair for SpO₂ during sleep and after alerts.</dd>
+        <dt>2 × photodiode</dt><dd>Picks up the reflected light. Signal quality (SQI) gates every reading before it counts.</dd>
+        <dt>3-axis accel</dt><dd>Tells a workout from a resting spike, so 146 BPM on a run stays quiet and 197 BPM at a desk does not.</dd>
+        <dt>Haptic + BLE 5.3</dt><dd>Buzzes on alerts and syncs to the phone app, which forwards to the PulseGuard server.</dd>
+      </dl>
     </div>
-  </section>
-
-  <!-- FEATURES SECTION -->
-  <section class="features" id="features">
-    <div class="container">
-      <div class="section-header">
-        <h2>Our Features</h2>
-        <p>PulseGuard AI offers a comprehensive set of features to help you understand and manage your heart health
-          effectively.</p>
+    <div class="card">
+      <h2>Where the data goes</h2>
+      <div class="flow">
+        <div class="node"><b>Band</b><span>PPG, motion, SOS button</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><b>Phone app</b><span>BLE sync, SQI filter</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><b>PulseGuard</b><span>Risk engine, reports</span></div>
+        <div class="arrow">→</div>
+        <div class="node"><b>Doctor · Family</b><span>Consult request, family card</span></div>
       </div>
-      <div class="feature-grid">
-        <div class="feature-card">
-          <div class="feature-icon">
-            <i class="fas fa-heartbeat"></i>
-          </div>
-          <h3>AI-Powered Prediction</h3>
-          <p>Our advanced XGBoost machine learning model analyzes your health parameters to predict heart disease risk
-            with high accuracy.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">
-            <i class="fas fa-robot"></i>
-          </div>
-          <h3>AI Health Assistant</h3>
-          <p>Get personalized guidance and answers to your health questions from our intelligent AI chatbot.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">
-            <i class="fas fa-file-pdf"></i>
-          </div>
-          <h3>PDF Reports</h3>
-          <p>Download comprehensive PDF reports of your heart health analysis to share with your healthcare provider.
-          </p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">
-            <i class="fas fa-chart-line"></i>
-          </div>
-          <h3>Risk Assessment</h3>
-          <p>Receive a detailed risk score and visualization of your heart disease probability based on personal health
-            data.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">
-            <i class="fas fa-apple-alt"></i>
-          </div>
-          <h3>Lifestyle Recommendations</h3>
-          <p>Get personalized diet, exercise, and habit modification suggestions to improve your heart health.</p>
-        </div>
-      </div>
+      <p class="note">This maps onto the existing site: the band replaces the 25-second camera scan on the Heart Rate page, alerts create the same Video Consult request, and the daily summary fills Reports &amp; Family.</p>
     </div>
   </section>
+</div>
+</section>
 
-  <!-- ============ PULSEGUARD WEAR 3D SHOWCASE SECTION ============ -->
-  <section id="wearable-showcase" class="wearable-showcase-section">
-    <style>
-      :root{
-        --pgw-bg:#0a0f12; --pgw-surface:#10171b; --pgw-surface-2:#161f24; --pgw-line:#223038; --pgw-fg:#e8eef0; --pgw-muted:#8b9ba2;
-        --pulse:#ff4d5e; --ok:#3ddc97; --warn:#ffb547; --sensor:#46f0a0;
-        --display:'Chakra Petch','Segoe UI',system-ui,sans-serif;
-        --body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
-        --mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
-      }
-      #wearable-showcase {
-        background: var(--pgw-bg);
-        color: var(--pgw-fg);
-        font-family: var(--body);
-        font-size: 15px;
-        line-height: 1.5;
-        border-top: 1px solid var(--pgw-line);
-        border-bottom: 1px solid var(--pgw-line);
-        padding: 80px 20px;
-        position: relative;
-      }
-      #wearable-showcase * { box-sizing: border-box; }
-      .pgw-header {
-        max-width: 1280px;
-        margin: 0 auto 36px;
-        text-align: center;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 12px;
-      }
-      .pgw-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        background: rgba(70, 240, 160, 0.1);
-        border: 1px solid rgba(70, 240, 160, 0.35);
-        color: var(--sensor);
-        padding: 6px 16px;
-        border-radius: 999px;
-        font-family: var(--mono);
-        font-size: 12px;
-        letter-spacing: .12em;
-        text-transform: uppercase;
-        font-weight: 600;
-      }
-      .pgw-title {
-        font-family: var(--display);
-        font-weight: 700;
-        font-size: clamp(32px, 4.5vw, 54px);
-        line-height: 1.05;
-        margin: 0;
-        letter-spacing: .01em;
-        background: linear-gradient(135deg, #ffffff 40%, #a4b3b8 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-      }
-      .pgw-lede {
-        color: var(--pgw-muted);
-        max-width: 68ch;
-        margin: 0;
-        font-size: 16.5px;
-      }
-      .pgw-nav-actions {
-        display: flex;
-        gap: 12px;
-        flex-wrap: wrap;
-        justify-content: center;
-        margin-top: 10px;
-      }
-      .pgw-nav-btn {
-        background: var(--pgw-surface);
-        color: var(--pgw-fg);
-        border: 1px solid var(--pgw-line);
-        border-radius: 10px;
-        padding: 10px 18px;
-        font-family: var(--body);
-        font-weight: 600;
-        font-size: 13.5px;
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        transition: all .2s ease;
-      }
-      .pgw-nav-btn:hover {
-        border-color: var(--sensor);
-        color: var(--sensor);
-        background: rgba(70, 240, 160, 0.08);
-        transform: translateY(-1px);
-      }
-      .pgw-nav-btn.primary {
-        background: linear-gradient(135deg, #1db954, #1aa34a);
-        color: #fff;
-        border-color: #1db954;
-        box-shadow: 0 4px 15px rgba(29, 185, 84, 0.3);
-      }
-      .pgw-nav-btn.primary:hover {
-        background: #1ed760;
-        color: #0b0c10;
-        border-color: #1ed760;
-      }
-
-      /* LIVE 3D SECTION */
-      #live .app{max-width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
-      #live .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--pulse);margin:0 0 6px}
-      #live h1{font-family:var(--display);font-weight:700;font-size:clamp(28px,3.8vw,44px);line-height:1.1;margin:0;letter-spacing:.01em}
-      #live .lede{color:var(--pgw-muted);max-width:64ch;margin:8px 0 0;font-size:15px}
-      #live .grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start}
-      @media (max-width:920px){
-        #live .grid{grid-template-columns:minmax(0,1fr)}
-      }
-      #live .col{display:flex;flex-direction:column;gap:14px;min-width:0}
-      #live .stage{position:relative;height:clamp(380px,64vh,640px);border:1px solid var(--pgw-line);border-radius:16px;overflow:hidden;cursor:grab;touch-action:pan-y;
-        background:
-          repeating-linear-gradient(0deg,rgba(255,255,255,.025) 0 1px,transparent 1px 40px),
-          repeating-linear-gradient(90deg,rgba(255,255,255,.025) 0 1px,transparent 1px 40px),
-          radial-gradient(ellipse at 50% 36%,#1b282e 0%,#0e1518 58%,#0a0f12 100%);}
-      #live .stage:active{cursor:grabbing}
-      #live .stage canvas{display:block;width:100%;height:100%}
-      #live .stage-meta{position:absolute;left:14px;right:14px;bottom:12px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;color:var(--pgw-muted);pointer-events:none}
-      #live .stage-tag{position:absolute;top:12px;left:14px;font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--pgw-muted);pointer-events:none}
-      #live .readout{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
-      @media (max-width:560px){
-        #live .readout{grid-template-columns:repeat(2,minmax(0,1fr))}
-      }
-      #live .tile{background:var(--pgw-surface);border:1px solid var(--pgw-line);border-radius:12px;padding:12px 14px;min-width:0}
-      #live .tile .k{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--pgw-muted)}
-      #live .tile .v{font-family:var(--display);font-weight:600;font-size:28px;line-height:1.15;font-variant-numeric:tabular-nums;margin-top:2px}
-      #live .tile .v small{font-family:var(--mono);font-size:12px;color:var(--pgw-muted);font-weight:400;margin-left:4px}
-      #live .pill{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:13px;font-weight:500;padding:4px 10px;border-radius:999px;margin-top:6px;border:1px solid currentColor}
-      #live .pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
-      #live .panel{background:var(--pgw-surface);border:1px solid var(--pgw-line);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:18px}
-      #live .group{display:flex;flex-direction:column;gap:8px}
-      #live .label{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--pgw-muted);display:flex;justify-content:space-between;gap:8px}
-      #live .seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:3px;background:var(--pgw-bg);border:1px solid var(--pgw-line);border-radius:10px;padding:3px}
-      #live .seg button{font:500 13px var(--body);color:var(--pgw-muted);background:transparent;border:0;border-radius:7px;padding:8px 4px;cursor:pointer}
-      #live .seg button:hover{color:var(--pgw-fg)}
-      #live .seg button[aria-pressed="true"]{background:var(--pgw-fg);color:var(--pgw-bg)}
-      #live .scen{display:flex;flex-direction:column;gap:6px}
-      #live .scen button{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 10px;text-align:left;background:var(--pgw-bg);color:var(--pgw-fg);border:1px solid var(--pgw-line);border-radius:10px;padding:9px 12px;cursor:pointer;font:500 14px var(--body)}
-      #live .scen button span{font-family:var(--mono);font-size:12.5px;color:var(--pgw-muted);font-variant-numeric:tabular-nums}
-      #live .scen button em{grid-column:1/-1;font-style:normal;font-size:12.5px;color:var(--pgw-muted);font-weight:400}
-      #live .scen button:hover{border-color:#35464f}
-      #live .scen button[aria-pressed="true"]{border-color:var(--pgw-fg);background:var(--pgw-surface-2)}
-      #live .scen button.danger[aria-pressed="true"]{border-color:var(--pulse)}
-      #live .swatches{display:flex;gap:8px;flex-wrap:wrap}
-      #live .sw{width:30px;height:30px;border-radius:50%;border:2px solid var(--pgw-bg);outline:1px solid var(--pgw-line);cursor:pointer;padding:0}
-      #live .sw[aria-pressed="true"]{outline:2px solid var(--pgw-fg);outline-offset:1px}
-      #live .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-      #live .btn{font:600 13.5px var(--body);border-radius:10px;padding:10px 14px;cursor:pointer;border:1px solid var(--pgw-line);background:var(--pgw-bg);color:var(--pgw-fg)}
-      #live .btn.sos{background:var(--pulse);border-color:var(--pulse);color:#1a0306;flex:1}
-      #live .btn:disabled{opacity:.45;cursor:not-allowed}
-      #live .toggle{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--pgw-muted);cursor:pointer}
-      #live .toggle input{accent-color:var(--pulse);width:16px;height:16px}
-      #live button:focus-visible,#live input:focus-visible{outline:2px solid var(--pulse);outline-offset:2px}
-      #live .log{background:var(--pgw-surface);border:1px solid var(--pgw-line);border-radius:12px;padding:12px 14px;min-width:0}
-      #live .log ol{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:190px;overflow:auto}
-      #live .log li{display:grid;grid-template-columns:62px 1fr;gap:10px;font-size:13.5px}
-      #live .log time{font-family:var(--mono);font-size:12px;color:var(--pgw-muted);font-variant-numeric:tabular-nums;padding-top:1px}
-      #live .log li.alert{color:var(--pulse)}
-      #live .log li.good{color:var(--ok)}
-      #live .below{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px}
-      @media (max-width:920px){
-        #live .below{grid-template-columns:minmax(0,1fr)}
-      }
-      #live .card{background:var(--pgw-surface);border:1px solid var(--pgw-line);border-radius:16px;padding:18px;min-width:0}
-      #live .card h2{font-family:var(--display);font-weight:600;font-size:20px;margin:0 0 12px;letter-spacing:.01em;color:var(--pgw-fg)}
-      #live .spec{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;margin:0}
-      #live .spec dt{font-family:var(--mono);font-size:12.5px;color:var(--sensor);white-space:nowrap}
-      #live .spec dd{margin:0;color:var(--pgw-muted);font-size:14px}
-      #live .flow{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap}
-      #live .node{flex:1 1 110px;background:var(--pgw-bg);border:1px solid var(--pgw-line);border-radius:10px;padding:10px 12px;min-width:0}
-      #live .node b{display:block;font-family:var(--display);font-weight:600;font-size:15px;color:var(--pgw-fg)}
-      #live .node span{font-size:12.5px;color:var(--pgw-muted)}
-      #live .arrow{align-self:center;color:var(--pgw-muted);font-family:var(--mono)}
-      #live .note{font-size:12.5px;color:var(--pgw-muted);margin:12px 0 0}
-
-      /* TEARDOWN SECTION */
-      #td{margin-top:64px;padding-top:40px;border-top:1px solid var(--pgw-line)}
-      #td .wrap{max-width:1320px;margin:0 auto}
-      #td .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--pulse);margin:0 0 6px}
-      #td h1{font-family:var(--display);font-weight:700;font-size:clamp(28px,3.8vw,44px);line-height:1.1;margin:0;text-wrap:balance;color:var(--pgw-fg)}
-      #td .lede{color:var(--pgw-muted);max-width:62ch;margin:8px 0 0;font-size:15px}
-      #td .head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-bottom:18px}
-      #td .seg{display:inline-grid;grid-auto-flow:column;gap:3px;background:var(--pgw-surface);border:1px solid var(--pgw-line);border-radius:10px;padding:3px}
-      #td .seg button{font:500 13.5px var(--body);color:var(--pgw-muted);background:transparent;border:0;border-radius:7px;padding:8px 18px;cursor:pointer}
-      #td .seg button[aria-pressed="true"]{background:var(--pgw-fg);color:var(--pgw-bg)}
-      #td button:focus-visible{outline:2px solid var(--pulse);outline-offset:2px}
-      #td .scrolly{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:28px;position:relative}
-      #td .stage{position:sticky;top:70px;height:85vh;height:85dvh;grid-column:2;grid-row:1;border:1px solid var(--pgw-line);border-radius:18px;overflow:hidden;cursor:grab;touch-action:pan-y;
-        background:repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0 1px,transparent 1px 44px),repeating-linear-gradient(90deg,rgba(255,255,255,.022) 0 1px,transparent 1px 44px),radial-gradient(ellipse at 50% 40%,#1b282e 0%,#0e1518 60%,#0a0f12 100%)}
-      #td .stage:active{cursor:grabbing}
-      #td .stage canvas{display:block;width:100%;height:100%}
-      #td .overlay{position:absolute;inset:0;pointer-events:none}
-      #td .overlay svg{position:absolute;inset:0;width:100%;height:100%}
-      #td .lbl{position:absolute;left:0;top:0;white-space:nowrap;font-family:var(--mono);font-size:12px;color:var(--pgw-muted);transition:color .2s}
-      #td .lbl b{font-family:var(--display);font-weight:600;font-size:14px;color:var(--pgw-fg);margin-right:6px}
-      #td .lbl .sub{display:block;padding-left:26px;font-size:11.5px;line-height:1.3}
-      #td .lbl{line-height:1.25}
-      #td .lbl .n{color:var(--pulse);margin-right:6px}
-      #td .lbl.on b{color:var(--pulse)}
-      #td .hud{position:absolute;left:14px;right:14px;top:12px;display:flex;justify-content:space-between;gap:10px;font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--pgw-muted);pointer-events:none}
-      #td .bar{position:absolute;left:14px;right:14px;bottom:14px;height:3px;background:var(--pgw-line);border-radius:3px;overflow:hidden;pointer-events:none}
-      #td .bar i{display:block;height:100%;width:0;background:var(--pulse)}
-      #td .steps{grid-column:1;grid-row:1;display:flex;flex-direction:column}
-      #td .step{min-height:85vh;display:flex;align-items:center}
-      #td .step:first-child{min-height:70vh;align-items:flex-start;padding-top:14vh}
-      #td .step:last-child{min-height:90vh}
-      #td .card{background:var(--pgw-surface);border:1px solid var(--pgw-line);border-radius:14px;padding:18px 20px;opacity:.45;transition:opacity .3s,border-color .3s;width:100%}
-      #td .step.active .card{opacity:1;border-color:#3a4c55}
-      #td .card .k{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--pulse)}
-      #td .card h2{font-family:var(--display);font-weight:600;font-size:24px;line-height:1.15;margin:6px 0 8px;color:var(--pgw-fg)}
-      #td .card p{margin:0;color:#c3ced2}
-      #td .card dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:12px 0 0;font-size:13.5px}
-      #td .card dt{font-family:var(--mono);font-size:12px;color:var(--pgw-muted);padding-top:1px}
-      #td .card dd{margin:0;color:var(--pgw-fg)}
-      #td .link{margin-top:12px;padding-top:10px;border-top:1px dashed var(--pgw-line);font-size:13.5px;color:var(--pgw-muted)}
-      #td .link strong{color:var(--sensor);font-weight:500}
-      @media (max-width:860px){
-        #td .scrolly{grid-template-columns:minmax(0,1fr);gap:0}
-        #td .stage{grid-column:1;height:56vh;height:56dvh;z-index:2;border-radius:14px;top:10px}
-        #td .steps{grid-column:1;grid-row:2}
-        #td .step,#td .step:first-child{min-height:70vh;align-items:flex-start;padding-top:0}
-        #td .step:first-child{padding-top:4vh}
-        #td .card{opacity:1}
-      }
-      #td .specs{margin-top:40px;background:var(--pgw-surface);border:1px solid var(--pgw-line);border-radius:16px;padding:20px}
-      #td .specs h2{font-family:var(--display);font-weight:600;font-size:22px;margin:0 0 4px;color:var(--pgw-fg)}
-      #td .specs p{color:var(--pgw-muted);margin:0 0 14px;font-size:14px}
-      #td .tbl{overflow-x:auto}
-      #td table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
-      #td th,#td td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--pgw-line);color:var(--pgw-fg)}
-      #td th{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--pgw-muted);font-weight:500}
-      #td td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
-      #td th.num{text-align:right}
-      #td td.n{font-family:var(--mono);color:var(--pulse);width:40px}
-      #td tfoot td{font-weight:600;border-bottom:0}
-    </style>
-
-    <div class="pgw-header">
-      <div class="pgw-badge"><i class="fas fa-microchip"></i> Hardware Innovation · 3D Bio-Sensing Lab</div>
-      <h2 class="pgw-title">PulseGuard Wear: 3D Studio &amp; Teardown</h2>
-      <p class="pgw-lede">Interact directly with our next-generation optical cardiovascular wearable. Spin in 3D, simulate resting vs. tachycardic rhythms, test motion-gated auto-alerts, and take the device apart layer by layer.</p>
-      
-      <div class="pgw-nav-actions">
-        <a href="#live" class="pgw-nav-btn"><i class="fas fa-eye"></i> Live 3D Model</a>
-        <a href="#td" class="pgw-nav-btn"><i class="fas fa-layer-group"></i> 9-Layer Teardown</a>
-        <a href="/wearable" class="pgw-nav-btn primary" target="_blank"><i class="fas fa-external-link-alt"></i> Open Fullscreen 3D Lab</a>
-      </div>
+<!-- ============ 2. LAYER-BY-LAYER TEARDOWN ============ -->
+<section id="td">
+<div class="wrap">
+  <div class="head">
+    <div>
+      <p class="eyebrow">PulseGuard AI · layer by layer</p>
+      <h1>PulseGuard Wear Teardown</h1>
+      <p class="lede">Scroll to take the device apart. Nine layers separate one at a time, from the sapphire glass down to the strap, with what each one does for the PulseGuard app. This is a concept model, not a shipping product.</p>
     </div>
-
-    <!-- ============ 1. LIVE 3D MODEL ============ -->
-    <div id="live">
-      <div class="app">
-        <header>
-          <p class="eyebrow">PulseGuard AI · wearable concept</p>
-          <h1>PulseGuard Wear</h1>
-          <p class="lede">A 3D model of the band that feeds the PulseGuard app: continuous PPG heart rate, alerts that know the difference between a workout and a problem, and one-press SOS. Every reading below is simulated in real time.</p>
-        </header>
-
-        <main class="grid">
-          <div class="col">
-            <div id="stage" class="stage" role="img" aria-label="Interactive 3D model of the PulseGuard Wear device">
-              <div class="stage-tag" id="stageTag">Watch · Graphite</div>
-              <div class="stage-meta"><span id="dims">44 × 38 mm case · 10.7 mm thick</span><span>Drag to rotate · scroll to zoom · Sensors view fades the strap</span></div>
-            </div>
-            <div class="readout">
-              <div class="tile"><div class="k">Heart rate</div><div class="v"><span id="rBpm">72</span><small>BPM</small></div></div>
-              <div class="tile"><div class="k">Signal quality</div><div class="v"><span id="rSqi">94</span><small>%</small></div></div>
-              <div class="tile"><div class="k">Risk score</div><div class="v"><span id="rRisk">34</span><small>/ 100</small></div></div>
-              <div class="tile"><div class="k">Status</div><div id="rStatus" class="pill" style="color:var(--ok)">Normal</div></div>
-            </div>
-            <div class="log">
-              <div class="label"><span>Device events</span><span>simulated</span></div>
-              <ol id="log" aria-live="polite"></ol>
-            </div>
-          </div>
-
-          <aside class="panel" aria-label="Device controls">
-            <div class="group">
-              <div class="label">Form factor</div>
-              <div class="seg" id="segForm">
-                <button id="fWatch" data-v="watch" aria-pressed="true">Watch</button>
-                <button id="fBand" data-v="band" aria-pressed="false">Band</button>
-              </div>
-            </div>
-            <div class="group">
-              <div class="label">Screen</div>
-              <div class="seg" id="segScreen">
-                <button id="sHeart" data-v="heart" aria-pressed="true">Heart</button>
-                <button id="sRisk" data-v="risk" aria-pressed="false">Risk</button>
-                <button id="sTrend" data-v="trend" aria-pressed="false">7-day</button>
-                <button id="sSos" data-v="sos" aria-pressed="false">SOS</button>
-              </div>
-            </div>
-            <div class="group">
-              <div class="label"><span>Scenario</span><span>motion</span></div>
-              <div class="scen" id="scen">
-                <button id="cRest" data-v="rest" aria-pressed="true">Resting <span>72 BPM · still</span><em>Normal sinus rhythm at the desk.</em></button>
-                <button id="cWalk" data-v="walk" aria-pressed="false">Brisk walk <span>104 BPM · moving</span><em>Elevated, explained by steps.</em></button>
-                <button id="cRun" data-v="run" aria-pressed="false">Workout <span>146 BPM · moving</span><em>Logged as exercise. No alert.</em></button>
-                <button id="cTachy" data-v="tachy" class="danger" aria-pressed="false">Tachycardia at rest <span>197 BPM · still</span><em>Sustained high rate with no motion. Triggers the doctor flow.</em></button>
-              </div>
-            </div>
-            <div class="group">
-              <div class="label">Case</div>
-              <div class="swatches" id="swCase"></div>
-              <div class="label" style="margin-top:6px">Strap</div>
-              <div class="swatches" id="swStrap"></div>
-            </div>
-            <div class="group">
-              <div class="label">View</div>
-              <div class="seg" id="segView">
-                <button id="vFront" data-v="front" aria-pressed="false">Front</button>
-                <button id="vSide" data-v="side" aria-pressed="false">Side</button>
-                <button id="vBack" data-v="back" aria-pressed="false">Sensors</button>
-              </div>
-              <label class="toggle"><input type="checkbox" id="auto" checked> Auto-rotate</label>
-            </div>
-            <div class="group">
-              <div class="label">Emergency</div>
-              <div class="row">
-                <button class="btn sos" id="btnSos">Hold-to-SOS (simulate)</button>
-                <button class="btn" id="btnCancel" disabled>Cancel</button>
-              </div>
-            </div>
-          </aside>
-        </main>
-
-        <section class="below">
-          <div class="card">
-            <h2>Sensor stack on the back</h2>
-            <dl class="spec">
-              <dt>4 × green LED</dt><dd>525 nm reflective PPG. The same signal your camera scan reads, but continuous and without a finger on the lens.</dd>
-              <dt>Red + IR LED</dt><dd>660 / 940 nm pair for SpO₂ during sleep and after alerts.</dd>
-              <dt>2 × photodiode</dt><dd>Picks up the reflected light. Signal quality (SQI) gates every reading before it counts.</dd>
-              <dt>3-axis accel</dt><dd>Tells a workout from a resting spike, so 146 BPM on a run stays quiet and 197 BPM at a desk does not.</dd>
-              <dt>Haptic + BLE 5.3</dt><dd>Buzzes on alerts and syncs to the phone app, which forwards to the PulseGuard server.</dd>
-            </dl>
-          </div>
-          <div class="card">
-            <h2>Where the data goes</h2>
-            <div class="flow">
-              <div class="node"><b>Band</b><span>PPG, motion, SOS button</span></div>
-              <div class="arrow">→</div>
-              <div class="node"><b>Phone app</b><span>BLE sync, SQI filter</span></div>
-              <div class="arrow">→</div>
-              <div class="node"><b>PulseGuard</b><span>Risk engine, reports</span></div>
-              <div class="arrow">→</div>
-              <div class="node"><b>Doctor · Family</b><span>Consult request, family card</span></div>
-            </div>
-            <p class="note">This maps onto the existing platform: the band replaces the 25-second camera scan on the Heart Rate page, alerts create the same Video Consult request, and the daily summary fills Reports &amp; Family.</p>
-          </div>
-        </section>
-      </div>
+    <div class="seg" id="tdForm" role="group" aria-label="Form factor">
+      <button id="tdWatch" data-v="watch" aria-pressed="true">Watch</button>
+      <button id="tdBand" data-v="band" aria-pressed="false">Band</button>
     </div>
-
-    <!-- ============ 2. LAYER-BY-LAYER TEARDOWN ============ -->
-    <div id="td">
-      <div class="wrap">
-        <div class="head">
-          <div>
-            <p class="eyebrow">PulseGuard AI · layer by layer</p>
-            <h1>PulseGuard Wear Teardown</h1>
-            <p class="lede">Scroll to take the device apart. Nine layers separate one at a time, from the sapphire glass down to the strap, with what each one does for the PulseGuard app. This is a concept model, not a shipping product.</p>
-          </div>
-          <div class="seg" id="tdForm" role="group" aria-label="Form factor">
-            <button id="tdWatch" data-v="watch" aria-pressed="true">Watch</button>
-            <button id="tdBand" data-v="band" aria-pressed="false">Band</button>
-          </div>
-        </div>
-
-        <div class="scrolly">
-          <div class="stage" id="tdStage" role="img" aria-label="3D exploded view of the PulseGuard Wear device">
-            <div class="overlay"><svg id="lines"></svg><div id="labels"></div></div>
-            <div class="hud"><span id="hudL">Assembled</span><span id="hudR">Drag to rotate</span></div>
-            <div class="bar"><i id="bar"></i></div>
-          </div>
-          <div class="steps" id="steps"></div>
-        </div>
-
-        <section class="specs">
-          <h2>Stack-up</h2>
-          <p id="specNote">Layer thickness from top to bottom for the watch. Switch to Band above to compare.</p>
-          <div class="tbl"><table>
-            <thead><tr><th>#</th><th>Layer</th><th>Material / part</th><th class="num">Thickness</th></tr></thead>
-            <tbody id="specBody"></tbody>
-            <tfoot><tr><td></td><td>Total stack</td><td></td><td class="num" id="specTotal"></td></tr></tfoot>
-          </table></div>
-        </section>
-      </div>
-    </div>
-  </section>
-
-  <!-- PREDICTION SECTION -->
-  <section class="prediction" id="prediction">
-    <div class="container">
-      <div class="section-header">
-        <h2>Heart Disease Prediction</h2>
-        <p>
-          Enter your health parameters below to get an instant prediction of
-          your heart disease risk.
-        </p>
-      </div>
-      <div class="prediction-container">
-        <div class="prediction-form">
-          <div class="form-header">
-            <h3>Your Health Information</h3>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label for="age">Age(in Years)</label>
-              <input type="number" id="age" class="form-control" placeholder="Enter your age" />
-            </div>
-
-            <div class="form-group">
-              <label for="height">Height (in cm)</label>
-              <input type="number" id="height" class="form-control" placeholder="Enter your height" />
-            </div>
-
-            <div class="form-group">
-              <label for="weight">weight (in Kg)</label>
-              <input type="number" id="weight" class="form-control" placeholder="Enter your weight" />
-            </div>
-
-            <div class="form-group">
-              <label for="bmi">BMI</label>
-              <input type="number" id="bmi" class="form-control" placeholder="Your BMI" />
-            </div>
-
-            <div class="form-group">
-              <label for="sex">Gender</label>
-              <select id="sex" class="form-control">
-                <option value="">Select</option>
-                <option value="1">Male</option>
-                <option value="0">Female</option>
-              </select>
-            </div>
-          </div>
-
-
-
-
-          <div class="form-group">
-            <label for="ch">Cholesterol(0: Normal, 1: Borderline, 2: High
-              )</label>
-            <select id="ch" class="form-control">
-              <option value="2">High</option>
-              <option value="1">Borderline</option>
-              <option value="0">Normal</option>
-            </select>
-          </div>
-
-
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="smoking">Do you smoke?</label>
-              <select id="smoking" class="form-control">
-                <option value="2">Regular</option>
-                <option value="1">Occasionally</option>
-                <option value="0">No</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="sleep">Your Sleep Cycle?</label>
-              <select id="sleep" class="form-control">
-                <option value="2">Good</option>
-                <option value="1">Average</option>
-                <option value="0">Poor</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="alcohol">Do you drink alcohol?</label>
-              <select id="alcohol" class="form-control">
-                <option value="2">Regular</option>
-                <option value="1">Occasionally</option>
-                <option value="0">No</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="physical">Physical activity in past 30 days?</label>
-              <select id="physical" class="form-control">
-                <option value="2">High</option>
-                <option value="1">Medium</option>
-                <option value="0">Low</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="hypertension">Hypertension</label>
-              <select id="hypertension" class="form-control">
-                <option value="">Select</option>
-                <option value="1">Yes</option>
-                <option value="0">No</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="diabetes">Diabetes level</label>
-              <select id="diabetes" class="form-control">
-                <option value="">Select</option>
-                <option value="1">Yes</option>
-                <option value="0">No</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="family">Family History</label>
-              <select id="family" class="form-control">
-                <option value="">Select</option>
-                <option value="1">Yes</option>
-                <option value="0">No</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="prediction-submit">
-            <button class="btn btn-primary" id="predict-btn">
-              <i class="fas fa-heart"></i>
-              Predict Heart Disease Risk
-            </button>
-            <button class="btn" id="clear-btn">
-              <i class="fas fa-sync-alt"></i>
-              Clear
-            </button>
-          </div>
-        </div>
-        <div class="prediction-results">
-          <div class="result-card" id="result-card">
-            <h3>Your Heart Disease Risk Result</h3>
-            <div class="prediction-chart">
-              <div class="risk-meter">
-                <div class="risk-circle">
-                  <div class="risk-inner">
-                    <span class="risk-percentage" id="risk-percentage">0%</span>
-                  </div>
-                </div>
-              </div>
-              <div class="risk-details">
-                <div class="risk-level" id="risk-level">Low Risk</div>
-                <p class="risk-message" id="risk-message">
-                  Please fill out the form to get your heart disease risk
-                  prediction.
-                </p>
-                <div class="download-report">
-                  <button class="btn btn-outline" id="download-btn" disabled>
-                    <i class="fas fa-file-download"></i>
-                    Download PDF Report
-                  </button>
-                  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <script>
-      document.getElementById("clear-btn").addEventListener("click", function () {
-        // Clear all form input fields
-        document.getElementById("age").value = "";
-        document.getElementById("height").value = "";
-        document.getElementById("weight").value = "";
-        document.getElementById("bmi").value = "";
-        document.getElementById("sex").value = "";
-        document.getElementById("ch").value = "1"; // Default to borderline
-        document.getElementById("smoking").value = "0"; // Default to No
-        document.getElementById("sleep").value = "1"; // Default to Average
-        document.getElementById("alcohol").value = "0"; // Default to No
-        document.getElementById("physical").value = "1"; // Default to Medium
-        document.getElementById("hypertension").value = "";
-        document.getElementById("diabetes").value = "";
-        document.getElementById("family").value = "";
-
-        // Reset prediction results
-        document.getElementById("risk-percentage").innerText = "0%";
-        document.getElementById("risk-level").innerText = "Low Risk";
-        document.getElementById("risk-message").innerText = "Please fill out the form to get your heart disease risk prediction.";
-        document.getElementById("download-btn").disabled = true;
-      }); // <-- Added closing brace and parenthesis
-    </script>
-
-  </section>
-
-  <!-- CHATBOT SECTION -->
-  <section class="chatbot" id="chatbot">
-    <section class="section">
-      <div class="chat-info">
-        <h2>AI Chat Assistant</h2>
-        <p>Get instant support and insights using our AI-powered chat system. Click the button below to start chatting!
-        </p>
-        <button class="chatbot-btn" onclick="openChatbot()">
-          <i class="fas fa-robot"></i> Chat with AI
-        </button>
-      </div>
-    </section>
-
-    <div class="overlay" id="overlay" onclick="closeChatbot()"></div>
-    <div class="chatbot-container" id="chatbotBox">
-      <div class="chatbot-header">AI Assistant <button class="close-btn" onclick="closeChatbot()">&times;</button></div>
-      <iframe src="https://www.chatbase.co/chatbot-iframe/aP6m96qm1qBzKqBADPzAx"></iframe>
-    </div>
-
-    <script>
-      function openChatbot() {
-        document.getElementById('chatbotBox').style.display = 'flex';
-        document.getElementById('overlay').style.display = 'block';
-      }
-
-      function closeChatbot() {
-        document.getElementById('chatbotBox').style.display = 'none';
-        document.getElementById('overlay').style.display = 'none';
-      }
-    </script>
-
-    <div class="chatbot-info">
-      <div class="info-card">
-        <h3>How CardioBot Helps You</h3>
-        <ul class="info-list">
-          <li>
-            <i class="fas fa-check-circle"></i>
-            <div>Get answers to health questions 24/7</div>
-          </li>
-          <li>
-            <i class="fas fa-check-circle"></i>
-            <div>Receive personalized lifestyle recommendations</div>
-          </li>
-          <li>
-            <i class="fas fa-check-circle"></i>
-            <div>Learn about heart disease risk factors</div>
-          </li>
-          <li>
-            <i class="fas fa-check-circle"></i>
-            <div>Understand your prediction results</div>
-          </li>
-          <li>
-            <i class="fas fa-check-circle"></i>
-            <div>Track your progress with helpful reminders</div>
-          </li>
-        </ul>
-      </div>
-    </div>
-    </div>
-    </div>
-  </section>
-
-  <!-- TESTIMONIALS SECTION -->
-  <section class="testimonials">
-    <div class="container">
-      <div class="section-header">
-        <h2>User Testimonials</h2>
-        <p>See what our users are saying about PulseGuard AI</p>
-      </div>
-      <div class="testimonial-slider">
-        <div class="testimonial-track" id="testimonial-track">
-          <div class="testimonial-card">
-            <div class="testimonial-content">
-              <p>PulseGuard AI helped me identify my heart disease risk early. Following the recommendations has
-                improved my health metrics significantly in just three months.</p>
-            </div>
-            <div class="testimonial-author">
-              <div class="author-avatar">JD</div>
-              <div class="author-info">
-                <h4>John Davis</h4>
-                <small>Software Engineer, 42</small>
-              </div>
-            </div>
-          </div>
-          <div class="testimonial-card">
-            <div class="testimonial-content">
-              <p>The AI chatbot is incredibly helpful. It answered all my questions and helped me understand what
-                lifestyle changes I needed to make to improve my heart health.</p>
-            </div>
-            <div class="testimonial-author">
-              <div class="author-avatar">SM</div>
-              <div class="author-info">
-                <h4>Sarah Miller</h4>
-                <small>Teacher, 38</small>
-              </div>
-            </div>
-          </div>
-          <div class="testimonial-card">
-            <div class="testimonial-content">
-              <p>PulseGuard AI is an innovative tool that enhances early heart disease detection, offering accurate
-                risk assessment and promoting proactive healthcare interventions</p>
-            </div>
-            <div class="testimonial-author">
-              <div class="author-avatar">MD</div>
-              <div class="author-info">
-                <h4>Dr. Nunudin Datta</h4>
-                <small>Doctor(BHMS)</small>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="testimonial-controls">
-          <div class="testimonial-dot active"></div>
-          <div class="testimonial-dot"></div>
-          <div class="testimonial-dot"></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-
-  <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      let index = 0;
-      const testimonials = document.querySelectorAll(".testimonial-card");
-      const dots = document.querySelectorAll(".testimonial-dot");
-      const totalTestimonials = testimonials.length;
-
-      function updateSlider() {
-        // Reset all testimonials
-        testimonials.forEach((card, i) => {
-          card.style.display = "none";
-          dots[i].classList.remove("active");
-        });
-
-        // Show the current testimonial
-        testimonials[index].style.display = "block";
-        dots[index].classList.add("active");
-
-        // Move to the next testimonial
-        index = (index + 1) % totalTestimonials;
-      }
-
-      // Initial call
-      updateSlider();
-
-      // Auto-slide every 3 seconds
-      setInterval(updateSlider, 3000);
-    });
-  </script>
-
-  <!-- FOOTER -->
-  <footer class="footer" id="contact">
-    <div class="container">
-      <div class="footer-content">
-        <div class="footer-about">
-          <div class="footer-logo">
-            <div class="logo">
-              <i class="fas fa-heartbeat"></i>
-              <span>PulseGuard AI</span>
-            </div>
-          </div>
-          <p>PulseGuard AI is an AI-powered heart disease prediction system that helps users assess their risk and take
-            proactive measures toward better heart health.</p>
-          <div class="social-links">
-            <a href="#" class="social-link"><i class="fab fa-facebook-f"></i></a>
-            <a href="#" class="social-link"><i class="fab fa-twitter"></i></a>
-            <a href="#" class="social-link"><i class="fab fa-linkedin-in"></i></a>
-            <a href="#" class="social-link"><i class="fab fa-instagram"></i></a>
-          </div>
-        </div>
-        <div class="footer-links">
-          <h3>Quick Links</h3>
-          <ul>
-            <li><a href="#home">Home</a></li>
-            <li><a href="#features">Features</a></li>
-            <li><a href="#prediction">Prediction</a></li>
-            <li><a href="#chatbot">AI Assistant</a></li>
-            <li><a href="#contact">Contact Us</a></li>
-          </ul>
-        </div>
-        <div class="footer-links">
-          <h3>Resources</h3>
-          <ul>
-            <li><a href="#">About Heart Disease</a></li>
-            <li><a href="#">Health Tips</a></li>
-            <li><a href="#">Privacy Policy</a></li>
-            <li><a href="#">Terms of Service</a></li>
-            <li><a href="#">FAQ</a></li>
-          </ul>
-        </div>
-        <div class="footer-newsletter">
-          <h3> Our Newsletter</h3>
-          <p>Subscribe to our newsletter to receive the latest updates on heart health and our AI technology.</p>
-          <div class="newsletter-form">
-            <input type="email" id="email-input" placeholder="Your email address">
-            <button onclick="validateEmail()">Subscribe</button>
-          </div>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <p>&copy; 2025 PulseGuard AI. All rights reserved.</p>
-      </div>
-    </div>
-  </footer>
-
-  <script>
-    function validateEmail() {
-      const emailInput = document.getElementById("email-input");
-      const email = emailInput.value.trim();
-      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // Basic email regex
-
-      if (email === "") {
-        alert("Please enter your email address.");
-      } else if (!emailPattern.test(email)) {
-        alert("Please enter a valid email address.");
-      } else {
-        alert("Thank you for subscribing! You will receive our latest updates.");
-        emailInput.value = ""; // Clear input after successful subscription
-      }
-    }
-  </script>
-
-
-  <script src="/static/index.js"></script>
-
-  <!-- Floating SOS Button -->
-  <a href="/emergency" id="floating-sos" style="position:fixed;bottom:28px;right:28px;z-index:9999;
-              width:64px;height:64px;border-radius:50%;
-              background:radial-gradient(circle,#ff3a3a,#e74c3c);
-              color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;
-              text-decoration:none;font-size:10px;font-weight:800;letter-spacing:1px;
-              box-shadow:0 0 0 0 rgba(231,76,60,0.7);
-              animation:sos-float 2s infinite;">
-    <i class="fas fa-exclamation-triangle" style="font-size:20px;margin-bottom:2px;"></i>SOS
-  </a>
-  <style>
-    @keyframes sos-float {
-
-      0%,
-      100% {
-        box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7);
-      }
-
-      70% {
-        box-shadow: 0 0 0 18px rgba(231, 76, 60, 0);
-      }
-    }
-  </style>
-
-  <!-- PulseGuard quick links bar -->
-  <div style="position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:9998;
-                background:rgba(10,10,10,0.92);border:1px solid #2a2a2e;border-radius:40px;
-                padding:10px 22px;display:flex;gap:16px;align-items:center;
-                backdrop-filter:blur(10px);box-shadow:0 4px 24px rgba(0,0,0,0.5);">
-    <a href="/dashboard"
-      style="color:#1db954;text-decoration:none;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">
-      <i class="fas fa-chart-line"></i>Dashboard</a>
-    <span style="color:#333;">|</span>
-    <a href="/wearable"
-      style="color:#46f0a0;text-decoration:none;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">
-      <i class="fas fa-cube"></i>Wearable 3D</a>
-    <span style="color:#333;">|</span>
-    <a href="/lifestyle"
-      style="color:#e6e6e6;text-decoration:none;font-size:13px;display:flex;align-items:center;gap:6px;">
-      <i class="fas fa-running"></i>Lifestyle</a>
-    <span style="color:#333;">|</span>
-    <a href="/diet" style="color:#e6e6e6;text-decoration:none;font-size:13px;display:flex;align-items:center;gap:6px;">
-      <i class="fas fa-apple-alt"></i>Diet AI</a>
-    <span style="color:#333;">|</span>
-    <a href="/emergency"
-      style="color:#e74c3c;text-decoration:none;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;">
-      <i class="fas fa-ambulance"></i>Emergency</a>
   </div>
 
+  <div class="scrolly">
+    <div class="stage" id="tdStage" role="img" aria-label="3D exploded view of the PulseGuard Wear device">
+      <div class="overlay"><svg id="lines"></svg><div id="labels"></div></div>
+      <div class="hud"><span id="hudL">Assembled</span><span id="hudR">Drag to rotate</span></div>
+      <div class="bar"><i id="bar"></i></div>
+    </div>
+    <div class="steps" id="steps"></div>
+  </div>
+
+  <section class="specs">
+    <h2>Stack-up</h2>
+    <p id="specNote">Layer thickness from top to bottom for the watch. Switch to Band above to compare.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>#</th><th>Layer</th><th>Material / part</th><th class="num">Thickness</th></tr></thead>
+      <tbody id="specBody"></tbody>
+      <tfoot><tr><td></td><td>Total stack</td><td></td><td class="num" id="specTotal"></td></tr></tfoot>
+    </table></div>
+  </section>
+</div>
+</section>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 /* pause whichever 3D view is off screen */
 window.PG_VIS={live:true,td:false};
-(function(){
-  const io=new IntersectionObserver(es=>es.forEach(e=>{
-    if(window.PG_VIS.hasOwnProperty(e.target.id)){
-      window.PG_VIS[e.target.id]=e.isIntersecting;
-    }
-  }),{rootMargin:'200px'});
-  ['live','td'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el) io.observe(el);
-  });
-})();
+(function(){const io=new IntersectionObserver(es=>es.forEach(e=>{window.PG_VIS[e.target.id]=e.isIntersecting;}),{rootMargin:'200px'});
+  ['live','td'].forEach(id=>io.observe(document.getElementById(id)));})();
 </script>
 <script>
 /* ---------- 1. LIVE 3D MODEL ---------- */
@@ -1329,6 +645,7 @@ function frame(now){
 }
 requestAnimationFrame(frame);
 })();
+
 </script>
 <script>
 /* ---------- 2. LAYER-BY-LAYER TEARDOWN ---------- */
@@ -1601,12 +918,7 @@ function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(!window.P
   requestAnimationFrame(frame);}
 requestAnimationFrame(frame);
 })();
+
 </script>
-
-{% if current_user.is_authenticated %}
-<script src="/static/voice.js"></script>
-{% endif %}
 </body>
-
-
 </html>

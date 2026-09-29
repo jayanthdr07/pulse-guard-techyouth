@@ -252,6 +252,7 @@
         <div class="pg-voice-chips">
             <button class="pg-voice-chip" onclick="window.PulseGuardVoice.execute('take ppg scan')"><i class="fas fa-fingerprint"></i> Take PPG Scan</button>
             <button class="pg-voice-chip sos" onclick="window.PulseGuardVoice.execute('trigger sos')"><i class="fas fa-ambulance"></i> Trigger SOS</button>
+            <button class="pg-voice-chip" onclick="window.PulseGuardVoice.execute('show wearable')"><i class="fas fa-cube"></i> Wearable 3D</button>
             <button class="pg-voice-chip" onclick="window.PulseGuardVoice.execute('start breathing exercise')"><i class="fas fa-wind"></i> 4-7-8 Breathing</button>
             <button class="pg-voice-chip" onclick="window.PulseGuardVoice.execute('how to lower heart rate')"><i class="fas fa-stethoscope"></i> Lower HR Guide</button>
             <button class="pg-voice-chip" onclick="window.PulseGuardVoice.execute('call doctor')"><i class="fas fa-video"></i> Consult Doctor</button>
@@ -579,6 +580,29 @@
                 window.location.href = "/reports";
                 return true;
             }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // 6. 3D WEARABLE MODEL & TEARDOWN ON VOICE COMMAND
+        // ══════════════════════════════════════════════════════════════════════
+        if (text.includes("wearable") || text.includes("3d watch") || text.includes("3d model") ||
+            text.includes("show wearable") || text.includes("open wearable") || text.includes("teardown") ||
+            text.includes("layer by layer") || text.includes("smart watch") || text.includes("hardware")) {
+            
+            const wShowcase = document.getElementById('wearable-showcase');
+            if (wShowcase) {
+                wShowcase.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                const msg = "Displaying the interactive 3D PulseGuard Wear model and layer-by-layer teardown.";
+                showCard(msg, rawText);
+                speak(msg);
+            } else {
+                const msg = "Launching the PulseGuard Wear 3D interactive model and teardown studio.";
+                showCard(msg, rawText);
+                speak(msg, () => {
+                    window.location.href = "/wearable";
+                });
+            }
+            return true;
         }
 
         if (text.includes("close report")) {
