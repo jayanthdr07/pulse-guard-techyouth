@@ -4,60 +4,49 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PulseGuard AI — CardioSense | Predict. Prevent. Protect.</title>
+  <title>PulseGuard AI — PulseGuard | Predict. Prevent. Protect.</title>
 
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 
 <body>
-  <!-- NAVBAR -->
-  <nav class="navbar">
-    <div class="container navbar-content">
-      <div class="logo">
-        <i class="fas fa-heartbeat"></i>
-        <span>CardioSense.AI</span>
-      </div>
-      <div class="nav-links">
-        <a href="#home" class="active">Home</a>
-        <a href="/dashboard" style="color:#1db954;font-weight:700;"><i class="fas fa-chart-line"></i> Dashboard</a>
-        <a href="/heartrate"><i class="fas fa-heartbeat"></i> Heart Rate (PPG)</a>
-        <a href="/appointments" style="color:#2ecc71;font-weight:700;"><i class="fas fa-video"></i> Video Consult</a>
-        <a href="/doctor" style="color:#3498db;font-weight:700;"><i class="fas fa-user-md"></i> Doctor Portal</a>
-        <a href="/reports"><i class="fas fa-file-medical"></i> Reports</a>
-        <a href="/chat"><i class="fas fa-robot"></i> AI Chat</a>
-        <a href="/emergency" style="color:#e74c3c;font-weight:700;">🚨 SOS Emergency</a>
+    <!-- NAVBAR -->
+  <nav class="navbar" style="background: rgba(10, 10, 15, 0.95); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 10px 0;">
+    <div class="container navbar-content" style="max-width: 1440px; width: 95%; margin: 0 auto; display: flex; justify-content: space-between; align-items: center;">
+      <a href="#home" class="logo" style="text-decoration: none; display: flex; align-items: center; gap: 10px;">
+        <i class="fas fa-heartbeat" style="color: var(--primary, #1db954); font-size: 26px;"></i>
+        <span style="font-weight: 800; font-size: 22px; background: linear-gradient(90deg, #1db954 0%, #2ecc71 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">PulseGuard AI</span>
+      </a>
+
+      <div class="nav-links" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <a href="#home" class="active" style="padding: 6px 10px; font-size: 13.5px; font-weight: 600;"><i class="fas fa-home"></i> Home</a>
+        <a href="/dashboard" style="color: #1db954; font-weight: 700; padding: 6px 10px; font-size: 13.5px;"><i class="fas fa-chart-line"></i> Dashboard</a>
+        <a href="/heartrate" style="padding: 6px 10px; font-size: 13.5px;"><i class="fas fa-heartbeat"></i> Heart Rate (PPG)</a>
+        <a href="/appointments" style="color: #2ecc71; font-weight: 700; padding: 6px 10px; font-size: 13.5px;"><i class="fas fa-video"></i> Video Consult</a>
+        <a href="/doctor" style="color: #3498db; font-weight: 700; padding: 6px 10px; font-size: 13.5px;"><i class="fas fa-user-md"></i> Doctor Portal</a>
+        <a href="/reports" style="padding: 6px 10px; font-size: 13.5px;"><i class="fas fa-file-medical"></i> Reports</a>
+        <a href="/chat" style="padding: 6px 10px; font-size: 13.5px;"><i class="fas fa-robot"></i> AI Chat</a>
+        
+        <a href="/emergency" style="background: linear-gradient(135deg, #e74c3c, #c0392b); color: #fff !important; font-weight: 800; padding: 7px 14px; border-radius: 20px; font-size: 13px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 10px rgba(231,76,60,0.4); margin: 0 4px;">
+          <i class="fas fa-ambulance"></i> 🚨 SOS Emergency
+        </a>
+
         {% if current_user.is_authenticated %}
-        <a href="/logout" style="color:#e74c3c;font-weight:700;"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        <a href="/logout" style="color: #e74c3c; border: 1px solid rgba(231,76,60,0.4); padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none;">
+          <i class="fas fa-sign-out-alt"></i> Logout ({{ current_user.full_name.split()[0] }})
+        </a>
         {% else %}
-        <a href="/login" style="color:var(--primary);font-weight:700;"><i class="fas fa-sign-in-alt"></i> Login</a>
-        <a href="/register" style="color:#fff;background:var(--primary);padding:6px 12px;border-radius:6px;font-weight:700;"><i class="fas fa-user-plus"></i> Register</a>
+        <a href="/login" style="color: var(--primary, #1db954); font-weight: 700; border: 1px solid var(--primary, #1db954); padding: 6px 12px; border-radius: 6px; font-size: 13px; text-decoration: none;">
+          <i class="fas fa-sign-in-alt"></i> Login
+        </a>
+        <a href="/register" style="color: #fff; background: var(--primary, #1db954); font-weight: 700; padding: 6px 14px; border-radius: 6px; font-size: 13px; text-decoration: none;">
+          <i class="fas fa-user-plus"></i> Register
+        </a>
         {% endif %}
       </div>
     </div>
   </nav>
-
-  <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      const navLinks = document.querySelectorAll(".nav-links a");
-
-      navLinks.forEach(link => {
-        link.addEventListener("click", function (event) {
-          const targetId = this.getAttribute("href");
-          if (targetId.startsWith("#")) {
-              event.preventDefault();
-              const targetSection = document.querySelector(targetId);
-              if (targetSection) {
-                window.scrollTo({
-                  top: targetSection.offsetTop - 80,
-                  behavior: "smooth"
-                });
-              }
-          }
-        });
-      });
-    });
-  </script>
 
   <!-- HERO SECTION -->
   <section class="hero" id="home">
@@ -66,7 +55,7 @@
       <div class="hero-content">
         <div class="hero-text">
           <h1>AI-Powered <span>Heart Disease</span> Prediction System</h1>
-          <p>CardioSense.AI uses advanced machine learning algorithms to predict your risk of heart disease based on key
+          <p>PulseGuard AI uses advanced machine learning algorithms to predict your risk of heart disease based on key
             health indicators. Get personalized insights, recommendations, and take control of your heart health today.
           </p>
           <div id="navbar" class="hero-buttons">
@@ -93,7 +82,7 @@
     <div class="container">
       <div class="section-header">
         <h2>Our Features</h2>
-        <p>CardioSense.AI offers a comprehensive set of features to help you understand and manage your heart health
+        <p>PulseGuard AI offers a comprehensive set of features to help you understand and manage your heart health
           effectively.</p>
       </div>
       <div class="feature-grid">
@@ -400,13 +389,13 @@
     <div class="container">
       <div class="section-header">
         <h2>User Testimonials</h2>
-        <p>See what our users are saying about CardioSense.AI</p>
+        <p>See what our users are saying about PulseGuard AI</p>
       </div>
       <div class="testimonial-slider">
         <div class="testimonial-track" id="testimonial-track">
           <div class="testimonial-card">
             <div class="testimonial-content">
-              <p>CardioSense.AI helped me identify my heart disease risk early. Following the recommendations has
+              <p>PulseGuard AI helped me identify my heart disease risk early. Following the recommendations has
                 improved my health metrics significantly in just three months.</p>
             </div>
             <div class="testimonial-author">
@@ -432,7 +421,7 @@
           </div>
           <div class="testimonial-card">
             <div class="testimonial-content">
-              <p>CardioSense.AI is an innovative tool that enhances early heart disease detection, offering accurate
+              <p>PulseGuard AI is an innovative tool that enhances early heart disease detection, offering accurate
                 risk assessment and promoting proactive healthcare interventions</p>
             </div>
             <div class="testimonial-author">
@@ -492,10 +481,10 @@
           <div class="footer-logo">
             <div class="logo">
               <i class="fas fa-heartbeat"></i>
-              <span>CardioSense.AI</span>
+              <span>PulseGuard AI</span>
             </div>
           </div>
-          <p>CardioSense.AI is an AI-powered heart disease prediction system that helps users assess their risk and take
+          <p>PulseGuard AI is an AI-powered heart disease prediction system that helps users assess their risk and take
             proactive measures toward better heart health.</p>
           <div class="social-links">
             <a href="#" class="social-link"><i class="fab fa-facebook-f"></i></a>
@@ -534,7 +523,7 @@
         </div>
       </div>
       <div class="footer-bottom">
-        <p>&copy; 2025 CardioSense.AI. All rights reserved.</p>
+        <p>&copy; 2025 PulseGuard AI. All rights reserved.</p>
       </div>
     </div>
   </footer>

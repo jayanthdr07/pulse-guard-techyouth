@@ -610,7 +610,42 @@ def diet():
 @app.route("/emergency")
 @login_required
 def emergency():
-    return render_template("emergency.html")
+    user_contacts = []
+    # Real saved relative contact from DB
+    if current_user.relative_name:
+        user_contacts.append({
+            "name": current_user.relative_name,
+            "phone": current_user.relative_phone or "Not provided",
+            "relation": current_user.relative_relation or "Designated Relative",
+            "icon": "fa-user-shield",
+            "is_user_saved": True
+        })
+    # Real user phone
+    if current_user.phone:
+        user_contacts.append({
+            "name": f"{current_user.full_name} (Patient)",
+            "phone": current_user.phone,
+            "relation": "Self / Registered Patient",
+            "icon": "fa-user",
+            "is_user_saved": True
+        })
+    # Doctor contact
+    user_contacts.append({
+        "name": "Dr. Jayanth Gowda",
+        "phone": "+91-7406282982",
+        "relation": "Cardiologist (On-Call)",
+        "icon": "fa-user-md",
+        "is_user_saved": False
+    })
+    # 112 National Emergency
+    user_contacts.append({
+        "name": "National Emergency Response Support",
+        "phone": "112",
+        "relation": "National Police & Medical Helpline",
+        "icon": "fa-ambulance",
+        "is_user_saved": False
+    })
+    return render_template("emergency.html", contacts=user_contacts)
 
 @app.route("/heartrate")
 @login_required
@@ -1226,54 +1261,74 @@ def get_hr_records():
 @app.route('/api/heartrate/analyze', methods=['POST'])
 def heartrate_analyze():
     try:
-        d = request.json
-        bpm        = int(d.get('bpm', 0))
-        hrv        = int(d.get('hrv', 0))
-        sqi        = int(d.get('sqi', 0))
-        confidence = int(d.get('confidence', 0))
+        d = request.json or {}
+        bpm        = int(float(d.get('bpm', 0)))
+        hrv        = int(float(d.get('hrv', 0)))
+        sqi        = int(float(d.get('sqi', 0)))
+        confidence = int(float(d.get('confidence', 0)))
         sig_qual   = d.get('signal_quality', 'low')
-        stress     = d.get('stress', 'Unknown')
+        stress     = d.get('stress', 'Normal')
         irregular  = bool(d.get('irregular', False))
         status     = d.get('status', 'measuring')
 
-        # ── Risk scoring from HR ────────────────────────────────────────────
+        # ── Accurate Clinical Cardiovascular Risk Engine ──────────────────────
         risk_score = 0
         alert = None
+        category = "Normal Sinus Rhythm"
 
-        if bpm > 150:
-            risk_score += 30
-            alert = f'Tachycardia detected ({bpm} BPM) — seek medical attention'
+        if bpm >= 160:
+            risk_score = 90
+            alert = f'Extreme Tachycardia / Acute Arrhythmia Risk ({bpm} BPM) — immediate clinical triage required'
+            category = "Extreme Tachycardia"
+        elif bpm >= 140:
+            risk_score = 75
+            alert = f'Severe Tachycardia detected ({bpm} BPM) — immediate rest and doctor consult advised'
+            category = "Severe Sinus Tachycardia"
+        elif bpm >= 120:
+            risk_score = 55
+            alert = f'Moderate Tachycardia detected ({bpm} BPM) — resting recovery & vagal breathing advised'
+            category = "Moderate Sinus Tachycardia"
         elif bpm > 100:
-            risk_score += 15
-        elif bpm < 40:
-            risk_score += 30
-            alert = f'Bradycardia detected ({bpm} BPM) — seek medical attention'
-        elif bpm < 55:
-            risk_score += 10
-
-        if hrv < 20 and hrv > 0:
-            risk_score += 15
-        elif hrv < 40 and hrv > 0:
-            risk_score += 5
+            risk_score = 35
+            alert = f'Mild Tachycardia detected ({bpm} BPM) — hydrate and rest'
+            category = "Mild Tachycardia"
+        elif bpm < 45:
+            risk_score = 75
+            alert = f'Severe Bradycardia detected ({bpm} BPM) — clinical evaluation required'
+            category = "Severe Bradycardia"
+        elif bpm < 60:
+            risk_score = 25
+            alert = f'Sinus Bradycardia detected ({bpm} BPM) — monitor for dizziness'
+            category = "Sinus Bradycardia"
+        else:
+            risk_score = 10
+            category = "Normal Sinus Rhythm"
 
         if irregular:
-            risk_score += 20
-            alert = alert or 'Irregular heartbeat pattern detected'
+            risk_score = min(100, risk_score + 20)
+            alert = (alert + ' + Irregular Rhythm') if alert else 'Irregular rhythm pattern detected'
 
-        risk_score = min(100, risk_score)
+        if hrv < 20 and hrv > 0:
+            risk_score = min(100, risk_score + 10)
 
-        if risk_score < 30:   risk_level = 'LOW'
-        elif risk_score < 60: risk_level = 'MODERATE'
-        else:                 risk_level = 'HIGH'
+        risk_score = min(100, max(5, risk_score))
 
-        # ── Auto SOS trigger for critical HR ───────────────────────────────
-        auto_sos = bpm > 180 or bpm < 30
+        if risk_score < 30:
+            risk_level = 'LOW'
+        elif risk_score < 60:
+            risk_level = 'MODERATE'
+        else:
+            risk_level = 'HIGH'
+
+        # Auto SOS trigger for critical thresholds
+        auto_sos = bpm >= 160 or bpm < 40 or (bpm >= 140 and irregular)
 
         return jsonify({
             'bpm': bpm, 'hrv': hrv, 'sqi': sqi,
             'confidence': confidence, 'signal_quality': sig_qual,
             'stress': stress, 'irregular': irregular,
             'risk_score': risk_score, 'risk_level': risk_level,
+            'category': category,
             'alert': alert, 'auto_sos': auto_sos,
             'status': status
         })

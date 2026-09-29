@@ -581,6 +581,17 @@
               .catch(() => {});
       }, 3000);
   }
+
+  // Auto-request consultation if initiated via voice command
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('autorequest') === '1' || urlParams.get('autoconsult') === '1') {
+      setTimeout(() => {
+          requestDoctorConsultation();
+          if (typeof speakAssistant === 'function') {
+              speakAssistant("Consultation request dispatched to Dr. Jayanth Gowda. Please stand by for live video call connection.");
+          }
+      }, 700);
+  }
   </script>
 
 {% if current_user.is_authenticated %}
