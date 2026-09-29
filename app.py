@@ -547,10 +547,10 @@ def emergency_sos():
             if latest_m:
                 latest_bpm = str(round(latest_m.bpm))
         twiml_say = (
-            f"Emergency alert from {user_name}. Pulse Guard detected an S O S event. "
+            f"Emergency alert from {user_name}. Pulse Guard detected a critical S O S event indicating a possible heart attack. "
             f"The latest recorded heart rate was {latest_bpm} beats per minute. "
             f"The user's last known location is {location}. "
-            f"Please contact the user immediately."
+            f"Please contact the user immediately and seek emergency medical assistance."
         )
 
 
@@ -568,12 +568,18 @@ def emergency_sos():
             for contact in contacts:
                 if not contact.get('phone'):
                     continue
+                
+                phone_num = contact['phone'].strip()
+                if not phone_num.startswith('+'):
+                    # Default to India +91 if not specified
+                    phone_num = '+91' + phone_num
+                
                 # SMS
                 try:
                     msg = twilio_client.messages.create(
                         body=sms_body,
                         from_=TWILIO_FROM,
-                        to=contact['phone']
+                        to=phone_num
                     )
                     sms_results.append({'name': contact['name'], 'status': 'sent', 'sid': msg.sid})
                 except Exception as sms_err:
@@ -584,7 +590,7 @@ def emergency_sos():
                     call = twilio_client.calls.create(
                         twiml=f'<Response><Say voice="alice" language="en-IN">{twiml_say}</Say><Pause length="1"/><Say voice="alice" language="en-IN">{twiml_say}</Say></Response>',
                         from_=TWILIO_FROM,
-                        to=contact['phone']
+                        to=phone_num
                     )
                     call_results.append({'name': contact['name'], 'status': 'called', 'sid': call.sid})
                 except Exception as call_err:
@@ -843,7 +849,7 @@ def api_hr_from_face():
                                     f"Location: https://maps.google.com/?q=12.9716,77.5946"
                                 ),
                                 from_=TWILIO_FROM,
-                                to=contact['phone']
+                                to=phone_num
                             )
                 except Exception as sms_e:
                     print("Twilio alert failed:", sms_e)
